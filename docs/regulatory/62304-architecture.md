@@ -49,7 +49,7 @@ Per IEC 62304 §5.3.3 — each external library used is documented here with ver
 
 | Library | Version | License | Intended use | Known hazards | Mitigation |
 | --- | --- | --- | --- | --- | --- |
-| GDCM | _TBD Phase 1_ | BSD-3-Clause | DICOM parsing & I/O | Mis-handling rare transfer syntaxes | Pinned version, full fixture coverage, mutation testing |
+| GDCM | **v3.2.5** (commit `dacccb6c0`, vendored at `third_party/gdcm/`) | BSD-3-Clause (modified) | DICOM parsing & I/O | Mis-handling rare transfer syntaxes (H-004); bundled-OpenJPEG/libjpeg/CharLS being shipped in Phase 1 transitively (replaced in Phase 2) | Pinned to exact tag (SR-0003); full fixture coverage planned Phase 2; mutation testing on safety-critical wrapping code; bundled deps tracked in [`THIRD_PARTY_LICENSES.md`](../../THIRD_PARTY_LICENSES.md) §1 |
 | libjpeg-turbo | _TBD Phase 1_ | BSD/IJG/zlib | JPEG decoding | Decoder bugs in Lossless mode historically | Pinned version, fixture suite per JPEG variant |
 | OpenJPEG | _TBD Phase 1_ | BSD-2-Clause | JPEG 2000 decoding | Memory issues on malformed streams | Sandbox via input validation, fuzz testing |
 | CharLS | _TBD Phase 1_ | BSD-3-Clause | JPEG-LS decoding | Less-tested codepaths | Fixture suite |
@@ -65,3 +65,4 @@ iOS and Android implementations of the same logical software item MUST produce b
 | Date | Change | Author |
 | --- | --- | --- |
 | 2026-04-26 | Initial skeleton | Vivek Sah |
+| 2026-04-26 | GDCM SOUP entry filled in: v3.2.5 vendored at `third_party/gdcm/`, BSD-3-Clause (modified). Note added re: GDCM-bundled OpenJPEG/libjpeg/CharLS shipped transitively in Phase 1, with Phase 2 replacement plan. | Vivek Sah |

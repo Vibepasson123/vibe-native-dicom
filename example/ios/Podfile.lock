@@ -2072,7 +2072,7 @@ SPEC CHECKSUMS:
   ReactCodegen: 2f0ae2f4bdb77897a207e3f8f26f767d94b2eecd
   ReactCommon: fe2a3af8975e63efa60f95fca8c34dc85deee360
   ReactNativeDependencies: 4f0d89ba4957a08910cb55f1888a671f1a569320
-  VibeNativeDicom: ac2dbb3dc3dde147d24ed821e6016ed64e36a116
+  VibeNativeDicom: b939c0fd8f053866cb3a00c9a27563483c672ea0
   Yoga: e83c3121d079541e69f3c5c623faaaf933fb5812
 
 PODFILE CHECKSUM: 7a7e89cc4bf03bbe79d55a182cff6a011cb0014b

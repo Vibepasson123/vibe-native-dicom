@@ -1,0 +1,6 @@
+[submodule "third_party/gdcm"]
+	path = third_party/gdcm
+	url = https://github.com/malaterre/GDCM
+	# Pinned to tag v3.2.5. See docs/regulatory/62304-architecture.md §4 SOUP inventory.
+	# To update: cd third_party/gdcm && git checkout <new-tag> && cd ../.. && git add third_party/gdcm
+	# Then update THIRD_PARTY_LICENSES.md and the SOUP inventory accordingly.
