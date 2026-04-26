@@ -1,5 +1,5 @@
 {
-  "name": "@viveksah/vibe-native-dicom",
+  "name": "@Vibepasson123/vibe-native-dicom",
   "version": "0.1.0",
   "description": "React Native library for DICOM parsing and rendering on iOS and Android",
   "main": "./lib/module/index.js",
@@ -51,14 +51,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/viveksah/vibe-native-dicom.git"
+    "url": "git+https://github.com/Vibepasson123/vibe-native-dicom.git"
   },
   "author": "Vivek Sah <octohealth.frontend@proton.me> (https://github.com/viveksah)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/viveksah/vibe-native-dicom/issues"
+    "url": "https://github.com/Vibepasson123/vibe-native-dicom/issues"
   },
-  "homepage": "https://github.com/viveksah/vibe-native-dicom#readme",
+  "homepage": "https://github.com/Vibepasson123/vibe-native-dicom#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
