@@ -30,7 +30,7 @@ Links each software requirement to its design, code, and test artifacts. Updated
 | SR-0007 | arch §3 | _Phase 1: VibeNativeDicom.podspec, ios/scripts/build-gdcm.sh_ | _Phase 1: pod install + xcodebuild for iphoneos and iphonesimulator_ | _n/a_ | Draft |
 | SR-0008 | arch §3 | _Phase 1: android/build.gradle_ | _Phase 1: gradle build artifact inspection_ | _n/a_ | Draft |
 | SR-0009 | arch §3 | `ios/VibeNativeDicom.mm` (in place from commit 92df3bf), `ios/VibeNativeDicomImpl.swift` | Code review; future SwiftLint rule (Phase 1.5) | _n/a_ | Draft |
-| SR-0010 | _TBD: docs/architecture/native-build.md_ | _Phase 1.1_ | Architecture doc has a "Adding a SOUP library" section | _n/a_ | Draft |
+| SR-0010 | [`docs/architecture/native-build.md`](../architecture/native-build.md) §4 | n/a (procedure doc, not code) | Inspection: section 4 contains a 15-step checklist | _n/a_ | Verified |
 
 ## Backlinks
 
