@@ -15,6 +15,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  traceability:
+    # SR-9001 — every commit touching src/, ios/, android/, or cpp/
+    # must reference at least one SR-XXXX requirement ID.
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Determine commit range
+        id: range
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.event.after }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "base=$PR_BASE_SHA" >> $GITHUB_OUTPUT
+            echo "head=$PR_HEAD_SHA" >> $GITHUB_OUTPUT
+          else
+            echo "base=$PUSH_BEFORE" >> $GITHUB_OUTPUT
+            echo "head=$PUSH_AFTER" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run traceability gate
+        env:
+          BASE_REF: ${{ steps.range.outputs.base }}
+          HEAD_REF: ${{ steps.range.outputs.head }}
+        run: node scripts/check-traceability.mjs
+
   lint:
     runs-on: ubuntu-latest
 
