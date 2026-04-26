@@ -49,7 +49,7 @@ Per IEC 62304 §5.3.3 — each external library used is documented here with ver
 
 | Library | Version | License | Intended use | Known hazards | Mitigation |
 | --- | --- | --- | --- | --- | --- |
-| GDCM | **v3.2.5** (commit `dacccb6c0`, vendored at `third_party/gdcm/`) | BSD-3-Clause (modified) | DICOM parsing & I/O | Mis-handling rare transfer syntaxes (H-004); bundled-OpenJPEG/libjpeg/CharLS being shipped in Phase 1 transitively (replaced in Phase 2) | Pinned to exact tag (SR-0003); full fixture coverage planned Phase 2; mutation testing on safety-critical wrapping code; bundled deps tracked in [`THIRD_PARTY_LICENSES.md`](../../THIRD_PARTY_LICENSES.md) §1 |
+| GDCM | **v3.2.5** (commit `dacccb6c0`, vendored at `third_party/gdcm/`) | BSD-3-Clause (modified) | DICOM parsing & I/O | Mis-handling rare transfer syntaxes (H-004); bundled OpenJPEG/libjpeg/CharLS being shipped in Phase 1 transitively (replaced in Phase 2); on Android, GDCM's MEC MR3 vendor-extension parser falls back to "No iconv support" for Japanese text fields because Android NDK ships no iconv (iOS unaffected — uses system libiconv) | Pinned to exact tag (SR-0003); full fixture coverage planned Phase 2; mutation testing on safety-critical wrapping code; bundled deps tracked in [`THIRD_PARTY_LICENSES.md`](../../THIRD_PARTY_LICENSES.md) §1; iconv shim documented in [`docs/architecture/native-build.md`](../architecture/native-build.md) §6 — vendor parser is not yet exposed via the public API, so divergence does not affect any shipping feature |
 | libjpeg-turbo | _TBD Phase 1_ | BSD/IJG/zlib | JPEG decoding | Decoder bugs in Lossless mode historically | Pinned version, fixture suite per JPEG variant |
 | OpenJPEG | _TBD Phase 1_ | BSD-2-Clause | JPEG 2000 decoding | Memory issues on malformed streams | Sandbox via input validation, fuzz testing |
 | CharLS | _TBD Phase 1_ | BSD-3-Clause | JPEG-LS decoding | Less-tested codepaths | Fixture suite |
@@ -66,3 +66,4 @@ iOS and Android implementations of the same logical software item MUST produce b
 | --- | --- | --- |
 | 2026-04-26 | Initial skeleton | Vivek Sah |
 | 2026-04-26 | GDCM SOUP entry filled in: v3.2.5 vendored at `third_party/gdcm/`, BSD-3-Clause (modified). Note added re: GDCM-bundled OpenJPEG/libjpeg/CharLS shipped transitively in Phase 1, with Phase 2 replacement plan. | Vivek Sah |
+| 2026-04-26 | Android iconv-shim caveat added to GDCM mitigations after Phase 1.3 verification: bionic ships no iconv, GDCM's MEC MR3 parser uses iconv, our shim returns failure so the vendor parser falls back gracefully on Android only. iOS unaffected. Cross-references [`docs/architecture/native-build.md`](../architecture/native-build.md) §6. | Vivek Sah |

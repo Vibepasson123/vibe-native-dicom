@@ -36,11 +36,24 @@ android {
   namespace "com.viveksah.vibenativedicom"
 
   compileSdkVersion getExtOrDefault("compileSdkVersion")
+  // Pinned NDK per SR-0003 (SOUP discipline). To upgrade, update both this
+  // line and the SOUP inventory in docs/regulatory/62304-architecture.md.
+  ndkVersion "27.1.12297006"
 
   defaultConfig {
     minSdkVersion getExtOrDefault("minSdkVersion")
     targetSdkVersion getExtOrDefault("targetSdkVersion")
   }
+
+  // GDCM is built via a standalone CMake invocation in
+  // android/scripts/build-gdcm.sh — outputs land in .build/android/<abi>/.
+  // We do NOT use AGP's externalNativeBuild here because the React Native
+  // autolinker on the consumer app side already creates a CMake target named
+  // react_codegen_VibeNativeDicomSpec, and our library's generated codegen
+  // CMakeLists creates the same target — the duplication breaks the app's
+  // CMake configure. The script-based approach mirrors the iOS XCFramework
+  // strategy and produces the same per-ABI artifacts that Phase 1.4 will
+  // consume from the JNI bridge via jniLibs/.
 
   buildFeatures {
     buildConfig true

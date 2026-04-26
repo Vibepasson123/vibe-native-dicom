@@ -168,25 +168,51 @@ example/ios/Pods/  (CocoaPods integrates the framework)
 
 ## 6. Android specifics
 
-GDCM is built as a **static library** linked into our shared `.so` via NDK CMake. Build flow:
+GDCM is built as a **static library per ABI** via a standalone CMake invocation in `android/scripts/build-gdcm.sh` — symmetric to the iOS approach in §5. The output static archives are consumed by Phase 1.4's JNI-bridge build, which produces our shared `libVibeNativeDicom.so` per ABI and stages it into `android/src/main/jniLibs/<abi>/` for the standard Gradle AAR build to package.
 
 ```
 third_party/gdcm/  (same submodule shared with iOS)
         │
         ▼
-android/src/main/cpp/CMakeLists.txt
-        │  add_subdirectory(${CMAKE_SOURCE_DIR}/../../../../third_party/gdcm gdcm)
-        │  target_link_libraries(VibeNativeDicom PRIVATE gdcmCommon gdcmDICT gdcmDSED ...)
+android/scripts/build-gdcm.sh
+        │  for each ABI in {arm64-v8a, x86_64}:
+        │    cmake -DCMAKE_TOOLCHAIN_FILE=<NDK>/build/cmake/android.toolchain.cmake
+        │          -DANDROID_ABI=<abi> -DANDROID_PLATFORM=android-24
+        │          -DCMAKE_C_FLAGS=-I<repo>/android/scripts/iconv-shim
+        │          -DCMAKE_CXX_FLAGS=-I<repo>/android/scripts/iconv-shim
+        │          [GDCM disable-flags identical to ios/scripts/build-gdcm.sh]
         ▼
-build/intermediates/cxx/.../  (CMake build output, gitignored)
+.build/android/gdcm/<abi>/install/{lib,include}/  (gitignored)
         │
         ▼
-android/build/outputs/aar/  (final AAR with embedded .so per ABI)
+[Phase 1.4] android/scripts/build-vibenative-jni.sh
+        │  builds libVibeNativeDicom.so per ABI against GDCM static libs
+        ▼
+android/src/main/jniLibs/<abi>/libVibeNativeDicom.so  (gitignored, regenerated)
+        │
+        ▼
+android/build/outputs/aar/  (Gradle's standard AAR build embeds jniLibs/)
 ```
 
-NDK version pinned in `android/build.gradle` to a specific NDK release (initially 26.x or whatever current at Phase 1 start).
+### Why a standalone script instead of AGP `externalNativeBuild`?
 
-ABIs targeted: `arm64-v8a` (production), `x86_64` (emulator). Optional `armeabi-v7a` if any customer requires 32-bit support; not committed by default.
+We initially tried `externalNativeBuild { cmake { path "src/main/cpp/CMakeLists.txt" } }` plus `add_subdirectory(third_party/gdcm)`. This produced a **duplicate-target collision** on `react_codegen_VibeNativeDicomSpec`: when the consuming app's React Native autolinker processes our package, both our package's auto-generated codegen CMakeLists *and* the app's own auto-generated codegen CMakeLists try to define the same target. AGP's CMake configure errors out.
+
+Switching to a standalone script side-steps the autolink entirely — our package no longer participates in AGP's CMake graph. The codegen target is created exactly once by the consuming app, and our pre-built `.so` rides into the AAR via `jniLibs/`. This pattern is also what react-native-mmkv and react-native-vision-camera use.
+
+### iconv shim
+
+Android's bionic libc does not ship `iconv`, but GDCM's `Utilities/gdcmext/mec_mr3_io.c` (Toshiba / Canon MEC MR3 vendor-extension parser) hard-includes `<iconv.h>`. To compile GDCM unmodified, we provide a header-only shim at `android/scripts/iconv-shim/iconv.h` whose `iconv_open` returns `(iconv_t)-1`. The upstream code already has a fallback for that case (emits the literal "No iconv support" for Japanese text fields).
+
+Effect on Android: the MEC MR3 vendor parser still works for everything except Japanese text within those proprietary tags. iOS uses the system libiconv and has full functionality. **No public API in `@viveksah/vibe-native-dicom` exposes this vendor parser today**, so this divergence does not break the cross-platform parity contract for any shipped feature. If we expose vendor-extension parsing in a future phase, this limitation is documented in the integration guide and the Conformance Statement.
+
+### NDK pinning
+
+NDK version pinned in `android/build.gradle`'s `ndkVersion` and in `android/scripts/build-gdcm.sh`'s `ANDROID_NDK_VERSION` default. Update both together.
+
+### ABIs
+
+`arm64-v8a` (production) and `x86_64` (emulator). Optional `armeabi-v7a` if any customer requires 32-bit ARM support; not shipped by default.
 
 ## 7. Open issues to decide before Phase 1.2 starts
 

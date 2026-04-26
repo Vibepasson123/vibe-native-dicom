@@ -22,7 +22,7 @@ Links each software requirement to its design, code, and test artifacts. Updated
 | SR-9003 | _TBD_ | `scripts/build-vv-package.mjs` (Phase 1) | `.github/workflows/release.yml::vv-package` (Phase 1) | _n/a_ | Draft |
 | SR-9004 | _TBD_ | `scripts/check-pinned-deps.mjs` (Phase 1) | `.github/workflows/ci.yml::pinned-deps` (Phase 1) | _n/a_ | Draft |
 | SR-0001 | arch §3, §4 GDCM SOUP entry | _Phase 1: ios/third_party/gdcm/_ | _Phase 1: ios build CI job_ | H-004 | Draft |
-| SR-0002 | arch §3, §4 GDCM SOUP entry | _Phase 1: android/src/main/cpp/gdcm/_ | _Phase 1: android build CI job_ | H-004 | Draft |
+| SR-0002 | [`docs/architecture/native-build.md`](../architecture/native-build.md) §6 | [`android/scripts/build-gdcm.sh`](../../android/scripts/build-gdcm.sh) + [`android/scripts/iconv-shim/iconv.h`](../../android/scripts/iconv-shim/iconv.h); third_party/gdcm submodule | Manual: bash android/scripts/build-gdcm.sh produces 14 static libs × 2 ABIs (verified locally Phase 1.3); CI Android build job (Phase 1.4) | H-004 | In progress |
 | SR-0003 | arch §4 SOUP discipline | `THIRD_PARTY_LICENSES.md` (skeleton); `docs/regulatory/62304-architecture.md` §4 | `scripts/check-pinned-deps.mjs` (Phase 1, SR-9004) | _n/a_ | Draft |
 | SR-0004 | _TBD: src/NativeVibeNativeDicom.ts spec_ | _Phase 1: src/index.ts, ios/VibeNativeDicomImpl.swift, android/.../VibeNativeDicomModule.kt_ | _Phase 1: example app integration test + parity test_ | H-004 | Draft |
 | SR-0005 | arch §6 (planned) | _Phase 1: ios/scripts/build-gdcm.sh, android/cpp/CMakeLists.txt_ | _Phase 1: clean-environment CI build_ | _n/a_ | Draft |
@@ -44,3 +44,4 @@ For convenience, requirements grouped by code module:
 | --- | --- | --- |
 | 2026-04-26 | Initial matrix | Vivek Sah |
 | 2026-04-26 | Added SR-0001..SR-0010 (Phase 1 build-infra requirements); updated SR-9001 status to "In progress" with implementation in `scripts/check-traceability.mjs` | Vivek Sah |
+| 2026-04-26 | SR-0002 moved to In progress: standalone Android GDCM build via `android/scripts/build-gdcm.sh` + iconv-shim verified locally to produce 14 static libs per ABI for arm64-v8a + x86_64. Final verification in CI deferred to Phase 1.4. | Vivek Sah |
