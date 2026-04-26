@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(yarn --version)",
+      "Bash(export PATH=\"$HOME/.nvm/versions/node/v22.22.2/bin:$PATH\")",
+      "Bash(npx --yes create-react-native-library@latest --help)",
+      "Read(//Users/viveksah/**)",
+      "Bash(npx --yes create-react-native-library@latest --directory /Users/viveksah/vibe_native_DICOM --slug @viveksah/vibe-native-dicom --description 'React Native library for DICOM parsing and rendering on iOS and Android' --author-name 'Vivek Sah' --author-email octohealth.frontend@proton.me --author-url https://github.com/viveksah --repo-url https://github.com/viveksah/vibe-native-dicom --type turbo-module --languages kotlin-swift --example vanilla --tools eslint --tools jest --tools lefthook --tools release-it --no-interactive)",
+      "Bash(npx --yes create-react-native-library@latest --directory /Users/viveksah/vibe_native_DICOM --slug @viveksah/vibe-native-dicom --description 'React Native library for DICOM parsing and rendering on iOS and Android' --author-name 'Vivek Sah' --author-email octohealth.frontend@proton.me --author-url https://github.com/viveksah --repo-url https://github.com/viveksah/vibe-native-dicom --type turbo-module --languages kotlin-objc --example vanilla --tools eslint --tools jest --tools lefthook --tools release-it --no-interactive)"
+    ]
+  }
+}
