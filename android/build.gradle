@@ -45,15 +45,12 @@ android {
     targetSdkVersion getExtOrDefault("targetSdkVersion")
   }
 
-  // GDCM is built via a standalone CMake invocation in
-  // android/scripts/build-gdcm.sh — outputs land in .build/android/<abi>/.
-  // We do NOT use AGP's externalNativeBuild here because the React Native
-  // autolinker on the consumer app side already creates a CMake target named
-  // react_codegen_VibeNativeDicomSpec, and our library's generated codegen
-  // CMakeLists creates the same target — the duplication breaks the app's
-  // CMake configure. The script-based approach mirrors the iOS XCFramework
-  // strategy and produces the same per-ABI artifacts that Phase 1.4 will
-  // consume from the JNI bridge via jniLibs/.
+  // GDCM and our JNI .so are built via standalone scripts (see
+  // docs/architecture/native-build.md §6 for why we don't use AGP's
+  // externalNativeBuild). The buildNativeLibs task below wires the JNI
+  // build into Gradle's preBuild so `./gradlew :app:assembleDebug` from
+  // the example produces a fresh libVibeNativeDicom.so per ABI before
+  // the AAR is packaged.
 
   buildFeatures {
     buildConfig true
@@ -78,3 +75,14 @@ android {
 dependencies {
   implementation "com.facebook.react:react-android"
 }
+
+// NOTE: Phase 1.4 ships the JNI bridge code, the standalone build script
+// (android/scripts/build-vibenative-jni.sh), and the Kotlin wiring. End-
+// to-end Gradle integration with `./gradlew :app:assembleDebug` is NOT yet
+// in place — the consumer app's RN codegen and our library's RN codegen
+// both define a react_codegen_<Spec> target, causing CMake to fail with
+// CMP0002. Tracking this as an open issue; see anomaly-list.md.
+//
+// To verify the JNI build manually before that issue is fixed:
+//   bash android/scripts/build-vibenative-jni.sh
+// produces android/src/main/jniLibs/<abi>/libVibeNativeDicom.so.

@@ -14,7 +14,11 @@ Pod::Spec.new do |s|
   s.source       = { :git => "https://github.com/Vibepasson123/vibe-native-dicom.git", :tag => "#{s.version}" }
 
   s.source_files = "ios/**/*.{h,m,mm,swift,cpp}"
-  s.private_header_files = "ios/**/*.h"
+  # Only the TurboModule shim header is private — it #imports the codegen
+  # spec header which uses C++ types and cannot live in the umbrella header.
+  # GdcmBridge.h is pure Obj-C and must be in the umbrella so Swift code in
+  # the same pod (VibeNativeDicomImpl.swift) can call into it.
+  s.private_header_files = "ios/VibeNativeDicom.h"
   s.exclude_files = "ios/scripts/**/*"
 
   s.swift_version = "5.9"

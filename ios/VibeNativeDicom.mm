@@ -12,6 +12,10 @@
   return [VibeNativeDicomImpl multiply:a b:b];
 }
 
+- (NSString *)getGdcmVersion {
+  return [VibeNativeDicomImpl getGdcmVersion];
+}
+
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
     (const facebook::react::ObjCTurboModule::InitParams &)params
 {
