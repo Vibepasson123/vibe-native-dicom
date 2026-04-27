@@ -8,10 +8,19 @@ apply plugin: "com.facebook.react"
  */
 react {
     /* Folders */
-    // npm workspaces hoist RN packages to the repo-root node_modules.
-    // Override RN's defaults (which expect ../../node_modules) to look one
-    // level higher.
-    root = file("../../../")
+    // npm workspaces hoist RN packages to the repo-root node_modules. We
+    // override reactNativeDir / codegenDir / cliFile to point at the hoisted
+    // copies (one extra `..` than the default).
+    //
+    // `root` deliberately points at `example/` (not the repo root), even
+    // though the repo root holds package.json. Reason: the repo-root
+    // package.json contains `codegenConfig` (for the library itself), and if
+    // the consumer app's `react.root` points at it, the app's gradle will
+    // ALSO run codegen for our spec — producing a second copy of
+    // `react_codegen_VibeNativeDicomSpec` and colliding with the library's
+    // own copy (autolinked via Android-autolinking.cmake). See A-001 in
+    // docs/regulatory/anomaly-list.md.
+    root = file("../..")
     reactNativeDir = file("../../../node_modules/react-native")
     codegenDir = file("../../../node_modules/@react-native/codegen")
     cliFile = file("../../../node_modules/react-native/cli.js")

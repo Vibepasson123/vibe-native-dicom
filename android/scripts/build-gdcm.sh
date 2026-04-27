@@ -27,8 +27,13 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 GDCM_SOURCE="$REPO_ROOT/third_party/gdcm"
 BUILD_ROOT="$REPO_ROOT/.build/android/gdcm"
 
-# ABIs we ship per SR-0008.
-ABIS=("arm64-v8a" "x86_64")
+# ABIs we ship per SR-0008. Gradle may scope this to a single variant ABI
+# via VND_ANDROID_ABIS (space-separated).
+if [[ -n "${VND_ANDROID_ABIS:-}" ]]; then
+  read -r -a ABIS <<< "$VND_ANDROID_ABIS"
+else
+  ABIS=("arm64-v8a" "x86_64")
+fi
 
 # Pinned NDK version. Must match android/build.gradle's ndkVersion.
 ANDROID_NDK_VERSION="${ANDROID_NDK_VERSION:-27.1.12297006}"

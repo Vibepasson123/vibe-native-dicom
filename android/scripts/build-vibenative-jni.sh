@@ -12,7 +12,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-ABIS=("arm64-v8a" "x86_64")
+# Allow Gradle to pin the build to a single variant ABI via VND_ANDROID_ABIS
+# (space-separated). When unset (manual invocation), build the full default set.
+if [[ -n "${VND_ANDROID_ABIS:-}" ]]; then
+  read -r -a ABIS <<< "$VND_ANDROID_ABIS"
+else
+  ABIS=("arm64-v8a" "x86_64")
+fi
 ANDROID_NDK_VERSION="${ANDROID_NDK_VERSION:-27.1.12297006}"
 ANDROID_NDK_ROOT="${ANDROID_NDK_ROOT:-${ANDROID_HOME:-$HOME/Library/Android/sdk}/ndk/$ANDROID_NDK_VERSION}"
 ANDROID_PLATFORM="${ANDROID_PLATFORM:-android-24}"

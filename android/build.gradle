@@ -76,13 +76,28 @@ dependencies {
   implementation "com.facebook.react:react-android"
 }
 
-// NOTE: Phase 1.4 ships the JNI bridge code, the standalone build script
-// (android/scripts/build-vibenative-jni.sh), and the Kotlin wiring. End-
-// to-end Gradle integration with `./gradlew :app:assembleDebug` is NOT yet
-// in place — the consumer app's RN codegen and our library's RN codegen
-// both define a react_codegen_<Spec> target, causing CMake to fail with
-// CMP0002. Tracking this as an open issue; see anomaly-list.md.
-//
-// To verify the JNI build manually before that issue is fixed:
-//   bash android/scripts/build-vibenative-jni.sh
-// produces android/src/main/jniLibs/<abi>/libVibeNativeDicom.so.
+// Build our prebuilt JNI .so per ABI before AAR packaging. We call into
+// android/scripts/build-vibenative-jni.sh (which transitively runs
+// build-gdcm.sh on first invocation) — see docs/architecture/native-build.md
+// §6 for why we don't use AGP's externalNativeBuild for GDCM.
+def reactNativeArchitectures = project.findProperty("reactNativeArchitectures")
+def jniAbis = reactNativeArchitectures
+  ? reactNativeArchitectures.toString().split(",").collect { it.trim() }
+  : ["arm64-v8a", "x86_64"]
+
+task buildNativeLibs(type: Exec) {
+  workingDir projectDir.parentFile
+  // Pass ABIs to the script so we only build what's needed for the variant.
+  environment "VND_ANDROID_ABIS", jniAbis.join(" ")
+  commandLine "bash", "${projectDir}/scripts/build-vibenative-jni.sh"
+
+  // The script writes into android/src/main/jniLibs/<abi>/. Declare those as
+  // outputs so Gradle can up-to-date check the task.
+  inputs.dir "${projectDir}/scripts"
+  inputs.dir "${projectDir}/src/main/cpp"
+  jniAbis.each { abi ->
+    outputs.file "${projectDir}/src/main/jniLibs/${abi}/libVibeNativeDicom.so"
+  }
+}
+
+preBuild.dependsOn buildNativeLibs

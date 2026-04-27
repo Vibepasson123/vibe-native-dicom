@@ -8,13 +8,13 @@ Known issues / anomalies in the package. Each entry has a risk classification pe
 
 | ID | Title | Description | Severity | Probability | Residual risk | Linked hazard | Found in version | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A-001 | Android Gradle build fails on duplicate `react_codegen_<Spec>` target | Running `./gradlew :app:assembleDebug` from `example/android` fails at CMake configure with `add_library cannot create target "react_codegen_VibeNativeDicomSpec" because another target with the same name already exists`. Root cause: the consumer app's RN autolink (Android-autolinking.cmake) does `add_subdirectory` on our library's auto-generated `<lib>/build/generated/source/codegen/jni/CMakeLists.txt`, AND ReactNative-application.cmake separately does `add_subdirectory` on the app's own `<app>/build/generated/source/codegen/jni/CMakeLists.txt`. Both define the same target. Affects Android end-to-end build only; the standalone JNI build (`bash android/scripts/build-vibenative-jni.sh`) and per-platform unit testing of the Kotlin module / JNI .cpp / GDCM static libs work correctly. iOS is unaffected. | S2 | P5 | A (acceptable) — does not affect any shipping feature (no Android distribution yet); blocks downstream Android Gradle integration only. | _n/a_ (build infrastructure issue, no clinical hazard) | 0.1.0 (Phase 1.4) | Open |
+| _none_ | | | | | | | | |
 
 ## Closed anomalies
 
 | ID | Title | Closed in version | Resolution |
 | --- | --- | --- | --- |
-| _none_ | | | |
+| A-001 | Android Gradle build fails on duplicate `react_codegen_<Spec>` target | 0.1.0 (Phase 1.4) | Root cause: the example app's `react.root` was pointing at the repo root (`../../../`), and the repo-root `package.json` declares `codegenConfig` for the library spec. RN's gradle plugin then ran `generateCodegenArtifactsFromSchema` for the *app* in addition to the library — emitting two CMakeLists.txt files that both defined `add_library(react_codegen_VibeNativeDicomSpec ...)`. The autolink machinery (`Android-autolinking.cmake`) `add_subdirectory`s the library copy first, then `ReactNative-application.cmake` includes the app copy, and CMake fails per CMP0002. Resolution: changed `react.root = file("../..")` in `example/android/app/build.gradle`, scoping app-level codegen detection to the `example/` directory (which has no `codegenConfig`). Library-level codegen continues to run via the library's own gradle (because `isLibrary=true`). End-to-end `./gradlew :app:assembleDebug` now succeeds for arm64-v8a + x86_64; both `libVibeNativeDicom.so` artifacts are packaged into the APK. The `buildNativeLibs` Gradle task in `android/build.gradle` was reinstated to wire the JNI build into `preBuild`. |
 
 ## Change history
 
@@ -22,3 +22,4 @@ Known issues / anomalies in the package. Each entry has a risk classification pe
 | --- | --- | --- |
 | 2026-04-26 | Initial empty list | Vivek Sah |
 | 2026-04-27 | Logged A-001 (Android Gradle codegen duplicate-target). Discovered during Phase 1.4 build verification. iOS Phase 1.4 verified clean; Android JNI standalone build verified clean; Gradle integration is the remaining gap. | Vivek Sah |
+| 2026-04-27 | Closed A-001. Root-caused to `react.root` scoping in `example/android/app/build.gradle` — pointing at the repo root caused the consumer app's RN gradle plugin to also run codegen for our spec, colliding with the library's autolinked codegen target. Fix scopes `react.root` to `example/` (which has no `codegenConfig`). End-to-end `./gradlew :app:assembleDebug` verified for arm64-v8a + x86_64 from a clean tree. | Vivek Sah |

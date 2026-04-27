@@ -1,25 +1,20 @@
-// Tells consumer apps' React Native autolinker how this library should be
-// included on each platform. See docs/architecture/native-build.md §6 for
-// the underlying decision.
+// Default RN autolink config — no overrides needed.
+// We rely on `codegenConfig.includesGeneratedCode = true` (in package.json)
+// to instruct consumer apps to skip codegen for our spec; our library's
+// own gradle build emits the codegen CMakeLists at the default location
+// (android/build/generated/source/codegen/jni/CMakeLists.txt), which the
+// consumer app's autolink picks up via Android-autolinking.cmake.
 //
-// Android: we explicitly null-out cmakeListsPath. By default the autolinker
-// includes our library's auto-generated build/generated/source/codegen/jni/
-// CMakeLists.txt in the consumer app's CMake configure, which defines a
-// react_codegen_<Spec> target. The consumer app's own autolink-generated
-// codegen CMakeLists *also* defines the same target — hence a duplicate-
-// target error at app build time. We don't need our codegen CMakeLists
-// to be picked up because we ship our compiled JNI as a prebuilt .so per
-// ABI (built via android/scripts/build-vibenative-jni.sh, packaged via
-// jniLibs/). The consumer app's codegen handles the JSI wrapper exactly
-// once.
+// History: an earlier attempt set `cmakeListsPath: null` to suppress the
+// autolink add_subdirectory() call, but @react-native-community/cli does a
+// truthiness check (not a null check) and silently falls back to the
+// default path. The proper fix is `includesGeneratedCode: true`.
 
 module.exports = {
   dependency: {
     platforms: {
       ios: {},
-      android: {
-        cmakeListsPath: null,
-      },
+      android: {},
     },
   },
 };
