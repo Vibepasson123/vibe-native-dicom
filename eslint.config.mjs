@@ -24,6 +24,17 @@ export default defineConfig([
     },
   },
   {
-    ignores: ['node_modules/', 'lib/'],
+    // .build/ holds CMake/native artifacts; .ts files inside it are CMake's
+    // dependency-tracking files (compiler_depend.ts), not TypeScript.
+    ignores: [
+      'node_modules/',
+      'lib/',
+      '.build/',
+      'android/build/',
+      'example/android/build/',
+      'example/android/app/build/',
+      'example/ios/build/',
+      'third_party/',
+    ],
   },
 ]);

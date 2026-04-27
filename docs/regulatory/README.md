@@ -23,6 +23,7 @@ This package is software being developed as a **component** for integration into
 | [`14971-hazard-analysis.md`](14971-hazard-analysis.md) | ISO 14971 | Hazard list, harm analysis, controls |
 | [`conformance-statement.md`](conformance-statement.md) | DICOM PS3.2 | What DICOM the package supports |
 | [`anomaly-list.md`](anomaly-list.md) | IEC 62304 §5.6.6 | Known issues with risk classification |
+| [`vv-evidence-phase-1.md`](vv-evidence-phase-1.md) | IEC 62304 §5.6 | Phase 1 V&V evidence manifest (frozen 2026-04-28) |
 
 ## Update rules
 

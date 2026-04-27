@@ -89,8 +89,8 @@ These are **required** for customers to use this package in a cleared device. Li
 | # | Phase | Deliverable | Effort |
 | --- | --- | --- | --- |
 | **0** | Process foundation | 62304 docs scaffolded, traceability tooling, CI gates, risk register opened | 1–2 wk |
-| **1** | Native build infra | GDCM + libjpeg-turbo + OpenJPEG + CharLS building inside iOS pod and Android Gradle. Hello-world call from JS into GDCM. | 3–4 wk |
-| **2** | DICOM I/O API | Read all uncompressed + compressed transfer syntaxes; metadata + pixel buffer to JS; DicomWeb client (QIDO/WADO/STOW) | 4–5 wk |
+| **1** | Native build infra | GDCM building inside iOS pod and Android Gradle (with GDCM's bundled libjpeg-turbo / OpenJPEG / CharLS). Hello-world call from JS into GDCM. | 3–4 wk |
+| **2** | DICOM I/O API | Read all uncompressed + compressed transfer syntaxes; metadata + pixel buffer to JS; DicomWeb client (QIDO/WADO/STOW). **Promote libjpeg-turbo / OpenJPEG / CharLS from GDCM-bundled to direct SOUP** as transfer-syntax fixtures force it (each gets its own SR + 14971 risk row). | 5–7 wk |
 | **3** | 2D Viewer (Fabric) | Metal/Vulkan renderer; W/L, pan/zoom/rotate, stack scroll, presets, HU display, inversion | 6–8 wk |
 | **4** | Measurement & annotation tools | Linear, angle, Cobb, ROI, bidirectional, persistable + DICOM SR export | 4–6 wk |
 | **5** | MPR | VTK build, volume builder, axial/sagittal/coronal/oblique slicing, sync cursors | 6–8 wk |
@@ -133,3 +133,4 @@ After Phase 0, **Phase 1 (build infra)** starts under full traceability.
 | Date | Change | Author |
 | --- | --- | --- |
 | 2026-04-26 | Initial plan committed | Vivek Sah |
+| 2026-04-28 | Re-scoped Phase 1: scope narrowed to GDCM-only build infrastructure (GDCM's bundled libjpeg-turbo / OpenJPEG / CharLS satisfy "Hello-world call from JS into GDCM" — original Phase 1 acceptance criterion). Direct-SOUP integration of those three libs deferred to Phase 2, where it pays off as transfer-syntax fixtures hit GDCM's bundled-fork limits. Phase 2 effort estimate raised 4–5 wk → 5–7 wk to absorb that work. | Vivek Sah |
