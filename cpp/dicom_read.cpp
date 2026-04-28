@@ -14,7 +14,10 @@
 #include "gdcmImageChangeTransferSyntax.h"
 #include "gdcmImageReader.h"
 #include "gdcmImageWriter.h"
+#include "gdcmItem.h"
 #include "gdcmReader.h"
+#include "gdcmSequenceOfItems.h"
+#include "gdcmSmartPointer.h"
 #include "gdcmTag.h"
 #include "gdcmTransferSyntax.h"
 #include "gdcmUIDGenerator.h"
@@ -146,6 +149,49 @@ std::string readStringAttr(const gdcm::DataSet& ds) {
   return s;
 }
 
+// Walks `ds` and fills `out` with one DicomElement per top-level data
+// element. SQ (Sequence) elements recurse via DicomElement::items — each
+// sequence item is itself a DicomDataset. Pixel data (7FE0,0010) is
+// excluded here; it's surfaced via the DicomImage struct.
+//
+// Recursion is bounded by GDCM's own parser (gdcm::Reader rejects files
+// with absurd nesting), so we don't need an explicit depth cap.
+void walkDataSet(const gdcm::DataSet& ds, DicomDataset& out) {
+  for (auto it = ds.Begin(); it != ds.End(); ++it) {
+    const gdcm::DataElement& de = *it;
+    const gdcm::Tag& tag = de.GetTag();
+    if (tag.IsGroupLength()) continue;  // (gggg,0000) — internal
+    if (tag == gdcm::Tag(0x7FE0, 0x0010)) continue;  // pixel data lives in DicomImage
+
+    DicomElement elem;
+    elem.vr = std::string(gdcm::VR::GetVRString(de.GetVR()));
+
+    if (elem.vr == "SQ") {
+      // SQ value is the items vector, not the inline string. An SQ may be
+      // empty (Type 2 zero-item sequence) which is legitimate.
+      gdcm::SmartPointer<gdcm::SequenceOfItems> seq = de.GetValueAsSQ();
+      if (seq && seq->GetNumberOfItems() > 0) {
+        elem.items.reserve(seq->GetNumberOfItems());
+        for (gdcm::SequenceOfItems::SizeType i = 1;
+             i <= seq->GetNumberOfItems(); ++i) {
+          // GDCM uses 1-based indexing for items (DICOM convention).
+          const gdcm::Item& item = seq->GetItem(i);
+          DicomDataset itemDs;
+          walkDataSet(item.GetNestedDataSet(), itemDs);
+          elem.items.push_back(std::move(itemDs));
+        }
+      }
+      elem.value = "";
+      elem.isEmpty = elem.items.empty();
+    } else {
+      elem.value = elementValueAsString(de, elem.vr);
+      elem.isEmpty = elem.value.empty() && de.GetVL() == 0;
+    }
+
+    out[formatTagKey(tag)] = std::move(elem);
+  }
+}
+
 }  // namespace
 
 void readDicomFile(const std::string& path, DicomFile& out) {
@@ -165,19 +211,7 @@ void readDicomFile(const std::string& path, DicomFile& out) {
   out.sopClassUID = readStringAttr<0x0008, 0x0016>(ds);
   out.sopInstanceUID = readStringAttr<0x0008, 0x0018>(ds);
 
-  // Walk every top-level data element. SQ (sequence) elements are emitted
-  // as empty values for now; nested traversal lands in Phase 2.3 along
-  // with the ergonomic helpers.
-  for (auto it = ds.Begin(); it != ds.End(); ++it) {
-    const gdcm::DataElement& de = *it;
-    const gdcm::Tag& tag = de.GetTag();
-    if (tag.IsGroupLength()) continue;  // (gggg,0000) — internal
-    DicomElement elem;
-    elem.vr = std::string(gdcm::VR::GetVRString(de.GetVR()));
-    elem.value = elementValueAsString(de, elem.vr);
-    elem.isEmpty = elem.value.empty() && de.GetVL() == 0;
-    out.dataset[formatTagKey(tag)] = std::move(elem);
-  }
+  walkDataSet(ds, out.dataset);
 
   // Image attributes — present even if we can't decode pixels yet.
   out.image.rows = readIntAttr<0x0028, 0x0010>(ds, 0);
@@ -345,6 +379,45 @@ void writeSyntheticDicomFile(const std::string& path,
   setText(0x0020, 0x0010, gdcm::VR::SH, "1");
   setText(0x0020, 0x0011, gdcm::VR::IS, "1");
   setText(0x0020, 0x0013, gdcm::VR::IS, "1");
+  // Viewer-relevant attributes — the Phase 2.3 ergonomic helpers
+  // (getPixelSpacing, getWindowCenter, getRescaleSlope, …) read these.
+  // Values picked so the round-trip test can assert exact byte equality
+  // for lossless syntaxes.
+  setText(0x0008, 0x1030, gdcm::VR::LO, "VND Synthetic Study");
+  setText(0x0008, 0x103E, gdcm::VR::LO, "VND Synthetic Series");
+  setText(0x0028, 0x0030, gdcm::VR::DS, "0.5\\0.5");      // PixelSpacing
+  setText(0x0028, 0x1050, gdcm::VR::DS, "128");           // WindowCenter
+  setText(0x0028, 0x1051, gdcm::VR::DS, "256");           // WindowWidth
+  setText(0x0028, 0x1052, gdcm::VR::DS, "0");             // RescaleIntercept
+  setText(0x0028, 0x1053, gdcm::VR::DS, "1");             // RescaleSlope
+
+  // Procedure Code Sequence (0008,1032) — a Type 3 SQ on MR Image
+  // Storage. Embedding one gives Phase 2.3 round-trip coverage of SQ
+  // walking. One item with the standard code-tuple shape.
+  {
+    gdcm::SmartPointer<gdcm::SequenceOfItems> seq = new gdcm::SequenceOfItems();
+    seq->SetLengthToUndefined();
+    gdcm::Item item;
+    item.SetVLToUndefined();
+    gdcm::DataSet& itemDs = item.GetNestedDataSet();
+    auto setItemText = [&](uint16_t g, uint16_t e, gdcm::VR vr,
+                           const char* value) {
+      gdcm::DataElement de(gdcm::Tag(g, e));
+      de.SetVR(vr);
+      de.SetByteValue(value, static_cast<uint32_t>(std::strlen(value)));
+      itemDs.Replace(de);
+    };
+    setItemText(0x0008, 0x0100, gdcm::VR::SH, "VND-001");      // CodeValue
+    setItemText(0x0008, 0x0102, gdcm::VR::SH, "VND");          // CodingSchemeDesignator
+    setItemText(0x0008, 0x0104, gdcm::VR::LO, "Synthetic procedure");  // CodeMeaning
+    seq->AddItem(item);
+
+    gdcm::DataElement seqDe(gdcm::Tag(0x0008, 0x1032));
+    seqDe.SetVR(gdcm::VR::SQ);
+    seqDe.SetValue(*seq);
+    seqDe.SetVLToUndefined();
+    ds.Replace(seqDe);
+  }
 
   if (!writer.Write()) {
     throw std::runtime_error(

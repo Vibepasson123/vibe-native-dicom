@@ -66,6 +66,65 @@ jobject newHashMap(JNIEnv* env, jclass mapCls, jmethodID mapCtor) {
   return env->NewObject(mapCls, mapCtor);
 }
 
+// Forward declaration for mutual recursion.
+jobject datasetToHashMap(JNIEnv* env, jclass mapCls, jmethodID mapCtor,
+                         jmethodID putMethod, const vnd::DicomDataset& ds);
+
+// Convert a single DicomElement to a HashMap matching the TS DicomElement
+// shape: SQ -> { vr, value: null, items: ArrayList<HashMap> }; non-SQ ->
+// { vr, value: string|null }.
+jobject elementToHashMap(JNIEnv* env, jclass mapCls, jmethodID mapCtor,
+                         jmethodID putMethod,
+                         const vnd::DicomElement& elem) {
+  jobject elemMap = newHashMap(env, mapCls, mapCtor);
+  putString(env, elemMap, putMethod, "vr", elem.vr);
+
+  if (elem.vr == "SQ") {
+    // value is null for SQ; the items vector becomes a Java ArrayList.
+    jstring valueKey = env->NewStringUTF("value");
+    env->CallObjectMethod(elemMap, putMethod, valueKey, nullptr);
+    env->DeleteLocalRef(valueKey);
+
+    jclass listCls = env->FindClass("java/util/ArrayList");
+    jmethodID listCtor = env->GetMethodID(listCls, "<init>", "()V");
+    jmethodID listAdd =
+        env->GetMethodID(listCls, "add", "(Ljava/lang/Object;)Z");
+    jobject items = env->NewObject(listCls, listCtor);
+    for (const auto& itemDs : elem.items) {
+      jobject itemMap =
+          datasetToHashMap(env, mapCls, mapCtor, putMethod, itemDs);
+      env->CallBooleanMethod(items, listAdd, itemMap);
+      env->DeleteLocalRef(itemMap);
+    }
+    jstring itemsKey = env->NewStringUTF("items");
+    env->CallObjectMethod(elemMap, putMethod, itemsKey, items);
+    env->DeleteLocalRef(itemsKey);
+    env->DeleteLocalRef(items);
+    env->DeleteLocalRef(listCls);
+  } else if (elem.isEmpty) {
+    jstring valueKey = env->NewStringUTF("value");
+    env->CallObjectMethod(elemMap, putMethod, valueKey, nullptr);
+    env->DeleteLocalRef(valueKey);
+  } else {
+    putString(env, elemMap, putMethod, "value", elem.value);
+  }
+  return elemMap;
+}
+
+jobject datasetToHashMap(JNIEnv* env, jclass mapCls, jmethodID mapCtor,
+                         jmethodID putMethod, const vnd::DicomDataset& ds) {
+  jobject map = newHashMap(env, mapCls, mapCtor);
+  for (const auto& kv : ds) {
+    jobject elemMap =
+        elementToHashMap(env, mapCls, mapCtor, putMethod, kv.second);
+    jstring jKey = env->NewStringUTF(kv.first.c_str());
+    env->CallObjectMethod(map, putMethod, jKey, elemMap);
+    env->DeleteLocalRef(jKey);
+    env->DeleteLocalRef(elemMap);
+  }
+  return map;
+}
+
 }  // namespace
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -145,23 +204,9 @@ Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeReadDicom(
   putString(env, root, putMethod, "sopClassUID", parsed.sopClassUID);
   putString(env, root, putMethod, "sopInstanceUID", parsed.sopInstanceUID);
 
-  // dataset: { "GGGG,EEEE": { vr, value } }
-  jobject datasetMap = newHashMap(env, mapCls, mapCtor);
-  for (const auto& kv : parsed.dataset) {
-    jobject elemMap = newHashMap(env, mapCls, mapCtor);
-    putString(env, elemMap, putMethod, "vr", kv.second.vr);
-    if (kv.second.isEmpty) {
-      jstring jKey = env->NewStringUTF("value");
-      env->CallObjectMethod(elemMap, putMethod, jKey, nullptr);
-      env->DeleteLocalRef(jKey);
-    } else {
-      putString(env, elemMap, putMethod, "value", kv.second.value);
-    }
-    jstring jKey = env->NewStringUTF(kv.first.c_str());
-    env->CallObjectMethod(datasetMap, putMethod, jKey, elemMap);
-    env->DeleteLocalRef(jKey);
-    env->DeleteLocalRef(elemMap);
-  }
+  // dataset: { "GGGG,EEEE": { vr, value, items? } } — recursive for SQ.
+  jobject datasetMap =
+      datasetToHashMap(env, mapCls, mapCtor, putMethod, parsed.dataset);
   jstring dsKey = env->NewStringUTF("dataset");
   env->CallObjectMethod(root, putMethod, dsKey, datasetMap);
   env->DeleteLocalRef(dsKey);

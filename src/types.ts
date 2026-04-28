@@ -2,17 +2,23 @@
 // the native bridge; native code emits objects that match these shapes.
 
 // A single DICOM data element. `vr` is the 2-char Value Representation
-// (e.g. 'PN', 'DA', 'UI', 'DS'), `value` is the parsed value or null when
-// the element is present but empty (DICOM "Type 2" empty values).
+// (e.g. 'PN', 'DA', 'UI', 'DS', 'SQ'), `value` is the parsed value or null
+// when the element is present but empty (DICOM "Type 2" empty values).
+//
+// Sequence (SQ) elements set `value` to null and populate `items` with the
+// nested datasets in DICOM order. An SQ may legitimately have zero items
+// (Type 2 empty sequence); helpers should treat `items: []` as "present
+// but empty" and `items: undefined` as "not a sequence".
 export type DicomElement = {
   vr: string;
   value: string | number | number[] | null;
+  items?: DicomDataset[];
 };
 
 // Dataset keyed by uppercase "GGGG,EEEE" hex string (e.g. "0010,0010").
 // We deliberately do NOT keyword-name tags here — the standard tag list
-// has thousands of entries and consumers may need private tags. Helpers
-// like `getPatientName(ds)` ship in Phase 2.2.
+// has thousands of entries and consumers may need private tags. The
+// ergonomic helpers in src/helpers.ts cover the most common viewer tags.
 export type DicomDataset = { [tagHex: string]: DicomElement };
 
 // Image attributes pulled out of the dataset for ergonomics — all viewer

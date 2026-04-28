@@ -15,6 +15,17 @@ import {
   isSupportedTransferSyntax,
   TransferSyntaxUID,
   LOSSLESS_TRANSFER_SYNTAXES,
+  // Phase 2.3 helpers
+  getPatientName,
+  getPatientID,
+  getStudyDescription,
+  getSeriesDescription,
+  getModality,
+  getPixelSpacing,
+  getWindowCenter,
+  getWindowWidth,
+  getRescaleSlope,
+  getRescaleIntercept,
   type DicomFile,
 } from '@viveksah/vibe-native-dicom';
 
@@ -81,6 +92,9 @@ export default function App() {
     readPass: boolean | null;
     message: string | null;
   }>({ supported: null, readPass: null, message: null });
+  // Phase 2.3: parsed file from the Implicit VR LE round-trip, used by the
+  // helpers + SQ display below.
+  const [reference, setReference] = useState<DicomFile | null>(null);
 
   useEffect(() => {
     try {
@@ -97,6 +111,11 @@ export default function App() {
       try {
         const path = writeSyntheticDicom(entry.uid);
         const parsed = readDicom(path);
+        // Capture the Implicit VR LE round trip so the helpers section
+        // can render against a known-good parsed dataset.
+        if (entry.uid === TransferSyntaxUID.ImplicitVRLittleEndian) {
+          setReference(parsed);
+        }
         const lossless = LOSSLESS_TRANSFER_SYNTAXES.includes(
           entry.uid as (typeof LOSSLESS_TRANSFER_SYNTAXES)[number]
         );
@@ -224,6 +243,83 @@ export default function App() {
         </Text>
       )}
 
+      <Text style={styles.section}>Helpers (Phase 2.3)</Text>
+      {reference === null && <ActivityIndicator />}
+      {reference !== null && (
+        <View style={styles.block}>
+          <Text style={styles.label}>Patient</Text>
+          <Text style={styles.value}>
+            {getPatientName(reference.dataset) ?? '(missing)'} ·{' '}
+            {getPatientID(reference.dataset) ?? '(missing)'}
+          </Text>
+          <Text style={styles.label}>Study</Text>
+          <Text style={styles.value}>
+            {getStudyDescription(reference.dataset) ?? '(missing)'}
+          </Text>
+          <Text style={styles.label}>Series · Modality</Text>
+          <Text style={styles.value}>
+            {getSeriesDescription(reference.dataset) ?? '(missing)'} ·{' '}
+            {getModality(reference.dataset) ?? '?'}
+          </Text>
+          <Text style={styles.label}>Pixel spacing (row × col, mm)</Text>
+          <Text style={styles.value}>
+            {(() => {
+              const ps = getPixelSpacing(reference.dataset);
+              return ps ? `${ps[0]} × ${ps[1]}` : '(missing)';
+            })()}
+          </Text>
+          <Text style={styles.label}>Window center / width</Text>
+          <Text style={styles.value}>
+            {getWindowCenter(reference.dataset) ?? '?'} /{' '}
+            {getWindowWidth(reference.dataset) ?? '?'}
+          </Text>
+          <Text style={styles.label}>Rescale slope · intercept</Text>
+          <Text style={styles.value}>
+            {getRescaleSlope(reference.dataset) ?? '?'} ·{' '}
+            {getRescaleIntercept(reference.dataset) ?? '?'}
+          </Text>
+        </View>
+      )}
+
+      <Text style={styles.section}>Sequence (SQ) traversal</Text>
+      {reference === null && <ActivityIndicator />}
+      {reference !== null &&
+        (() => {
+          const sq = reference.dataset['0008,1032']; // Procedure Code Sequence
+          if (!sq) {
+            return (
+              <Text style={styles.fail}>
+                FAIL · Procedure Code Sequence (0008,1032) missing
+              </Text>
+            );
+          }
+          if (sq.vr !== 'SQ') {
+            return (
+              <Text style={styles.fail}>
+                FAIL · (0008,1032) VR is {sq.vr}, expected SQ
+              </Text>
+            );
+          }
+          const items = sq.items ?? [];
+          if (items.length === 0) {
+            return <Text style={styles.fail}>FAIL · 0 items in SQ</Text>;
+          }
+          const item0 = items[0];
+          if (!item0) {
+            return <Text style={styles.fail}>FAIL · undefined item</Text>;
+          }
+          const codeValue = item0['0008,0100']?.value ?? '?';
+          const codeMeaning = item0['0008,0104']?.value ?? '?';
+          return (
+            <View style={styles.block}>
+              <Text style={styles.pass}>
+                PASS · {items.length} item · code {String(codeValue)} ·{' '}
+                {String(codeMeaning)}
+              </Text>
+            </View>
+          );
+        })()}
+
       <Text style={styles.section}>Overall</Text>
       <Text style={overallPass ? styles.passLarge : styles.failLarge}>
         {overallPass ? 'PASS' : 'FAIL'}
@@ -272,6 +368,9 @@ const styles = StyleSheet.create({
     color: '#888',
     fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
     marginBottom: 2,
+  },
+  block: {
+    marginTop: 6,
   },
   pass: {
     fontSize: 14,

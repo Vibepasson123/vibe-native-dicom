@@ -16,6 +16,37 @@ static NSError *makeError(const std::string &msg) {
                                        [NSString stringWithUTF8String:msg.c_str()]}];
 }
 
+// Forward declaration for mutual recursion with elementToDictionary.
+static NSDictionary *datasetToDictionary(const vnd::DicomDataset &ds);
+
+// Convert a single C++ DicomElement to an NSDictionary matching the TS
+// DicomElement shape. SQ elements emit `items: [DicomDataset, ...]`;
+// non-SQ elements emit `value: string | null`.
+static NSDictionary *elementToDictionary(const vnd::DicomElement &elem) {
+  NSString *vr = [NSString stringWithUTF8String:elem.vr.c_str()];
+  if (elem.vr == "SQ") {
+    NSMutableArray *items =
+        [NSMutableArray arrayWithCapacity:elem.items.size()];
+    for (const auto &itemDs : elem.items) {
+      [items addObject:datasetToDictionary(itemDs)];
+    }
+    return @{@"vr": vr, @"value": [NSNull null], @"items": items};
+  }
+  id value = elem.isEmpty
+                 ? (id)[NSNull null]
+                 : (id)[NSString stringWithUTF8String:elem.value.c_str()];
+  return @{@"vr": vr, @"value": value};
+}
+
+static NSDictionary *datasetToDictionary(const vnd::DicomDataset &ds) {
+  NSMutableDictionary *out = [NSMutableDictionary dictionary];
+  for (const auto &kv : ds) {
+    NSString *key = [NSString stringWithUTF8String:kv.first.c_str()];
+    out[key] = elementToDictionary(kv.second);
+  }
+  return out;
+}
+
 @implementation GdcmBridge
 
 + (NSString *)version {
@@ -33,17 +64,7 @@ static NSError *makeError(const std::string &msg) {
     return nil;
   }
 
-  NSMutableDictionary *dataset = [NSMutableDictionary dictionary];
-  for (const auto &kv : parsed.dataset) {
-    NSString *key = [NSString stringWithUTF8String:kv.first.c_str()];
-    id value = kv.second.isEmpty
-                   ? (id)[NSNull null]
-                   : (id)[NSString stringWithUTF8String:kv.second.value.c_str()];
-    dataset[key] = @{
-      @"vr": [NSString stringWithUTF8String:kv.second.vr.c_str()],
-      @"value": value,
-    };
-  }
+  NSDictionary *dataset = datasetToDictionary(parsed.dataset);
 
   NSDictionary *image = @{
     @"rows": @(parsed.image.rows),

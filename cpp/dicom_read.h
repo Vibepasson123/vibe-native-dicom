@@ -14,19 +14,35 @@
 
 namespace vnd {
 
+// Forward declaration — DicomElement is a recursive type because SQ
+// (Sequence) elements contain a list of items, each item being itself a
+// dataset (i.e. a map of DicomElements).
+struct DicomElement;
+
+// A flat dataset keyed by uppercase "GGGG,EEEE" hex string. SQ items are
+// represented inline via DicomElement::items rather than via reserved
+// keys, so consumers can iterate `dataset` without filtering.
+using DicomDataset = std::map<std::string, DicomElement>;
+
 struct DicomElement {
-  // 2-char DICOM Value Representation (e.g. "PN", "UI", "DS").
+  // 2-char DICOM Value Representation (e.g. "PN", "UI", "DS", "SQ").
   std::string vr;
 
   // The element's value, formatted as a string (DICOM's native form for
   // most VRs). Multi-valued elements (DS, IS, etc.) use the standard
   // backslash separator. Empty elements are present but with empty `value`.
+  // Always empty when vr == "SQ" — sequence content lives in `items`.
   std::string value;
 
   // True when the element exists in the dataset but has no value
   // (DICOM "Type 2"). Distinguishes "missing tag" (entry absent from the
   // map entirely) from "tag present, value empty".
   bool isEmpty;
+
+  // Sequence items, in order. Populated only when vr == "SQ"; empty for
+  // all other VRs. An SQ may legitimately contain zero items (Type 2
+  // empty sequences).
+  std::vector<DicomDataset> items;
 };
 
 // Image attributes pulled out of the dataset for ergonomics. Mirrors the
@@ -62,9 +78,7 @@ struct DicomFile {
   std::string sopClassUID;
   std::string sopInstanceUID;
 
-  // Dataset keyed by uppercase "GGGG,EEEE" hex string.
-  std::map<std::string, DicomElement> dataset;
-
+  DicomDataset dataset;
   DicomImage image;
 };
 

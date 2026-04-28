@@ -17,3 +17,31 @@ export {
   LOSSY_TRANSFER_SYNTAXES,
   type TransferSyntaxUIDValue,
 } from './transferSyntax';
+export {
+  // Patient
+  getPatientName,
+  getPatientID,
+  getPatientBirthDate,
+  getPatientSex,
+  // Study
+  getStudyInstanceUID,
+  getStudyDate,
+  getStudyTime,
+  getStudyDescription,
+  getAccessionNumber,
+  // Series
+  getSeriesInstanceUID,
+  getSeriesNumber,
+  getSeriesDescription,
+  getModality,
+  // SOP / Image
+  getSOPInstanceUID,
+  getInstanceNumber,
+  // Pixel geometry
+  getPixelSpacing,
+  // VOI / rescale
+  getWindowCenter,
+  getWindowWidth,
+  getRescaleIntercept,
+  getRescaleSlope,
+} from './helpers';

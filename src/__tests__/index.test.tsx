@@ -44,8 +44,52 @@ jest.mock('../NativeVibeNativeDicom', () => {
           sopClassUID: '1.2.840.10008.5.1.4.1.1.4',
           sopInstanceUID: '1.2.3.4.5.6.7.8.9',
           dataset: {
+            // Patient
             '0010,0010': { vr: 'PN', value: 'VibeNativeDicom^Synthetic' },
+            '0010,0020': { vr: 'LO', value: 'VND-SYN-001' },
+            '0010,0030': { vr: 'DA', value: '20000101' },
+            '0010,0040': { vr: 'CS', value: 'O' },
+            // Study
+            '0020,000D': { vr: 'UI', value: '1.2.3.4.5' },
+            '0008,0020': { vr: 'DA', value: '20260101' },
+            '0008,0030': { vr: 'TM', value: '120000' },
+            '0008,0050': { vr: 'SH', value: 'VND0001' },
+            '0008,1030': { vr: 'LO', value: 'VND Synthetic Study' },
+            // Series
+            '0020,000E': { vr: 'UI', value: '1.2.3.4.5.6' },
+            '0020,0011': { vr: 'IS', value: '1' },
+            '0008,103E': { vr: 'LO', value: 'VND Synthetic Series' },
+            '0008,0060': { vr: 'CS', value: 'MR' },
+            // SOP / Image
+            '0020,0013': { vr: 'IS', value: '1' },
+            // Pixel geometry
             '0028,0010': { vr: 'US', value: '16' },
+            '0028,0030': { vr: 'DS', value: '0.5\\0.5' },
+            // VOI / rescale
+            '0028,1050': { vr: 'DS', value: '128' },
+            '0028,1051': { vr: 'DS', value: '256' },
+            '0028,1052': { vr: 'DS', value: '0' },
+            '0028,1053': { vr: 'DS', value: '1' },
+            // Sequence (SQ) — Procedure Code Sequence
+            '0008,1032': {
+              vr: 'SQ',
+              value: null,
+              items: [
+                {
+                  '0008,0100': { vr: 'SH', value: 'VND-001' },
+                  '0008,0102': { vr: 'SH', value: 'VND' },
+                  '0008,0104': {
+                    vr: 'LO',
+                    value: 'Synthetic procedure',
+                  },
+                },
+              ],
+            },
+            // A Type 2 empty SQ (zero items) for the "empty sequence is
+            // legitimate" path coverage.
+            '0040,0260': { vr: 'SQ', value: null, items: [] },
+            // A Type 2 empty value (present, no value) for helper-null path.
+            '0008,0090': { vr: 'PN', value: null },
           },
           image: {
             rows: 16,
@@ -142,5 +186,110 @@ describe('@viveksah/vibe-native-dicom — public surface', () => {
     expect(lossless.size + lossy.size).toBe(all.size);
     for (const uid of all)
       expect(lossless.has(uid) || lossy.has(uid)).toBe(true);
+  });
+});
+
+describe('Phase 2.3 — Sequence (SQ) traversal', () => {
+  it('emits SQ as { vr: SQ, value: null, items: DicomDataset[] }', () => {
+    const file = lib.readDicom('/tmp/vnd-synthetic-default.dcm');
+    const sq = file.dataset['0008,1032'];
+    expect(sq).toBeDefined();
+    expect(sq?.vr).toBe('SQ');
+    expect(sq?.value).toBeNull();
+    expect(Array.isArray(sq?.items)).toBe(true);
+    expect(sq?.items?.length).toBe(1);
+  });
+
+  it('SQ items are themselves DicomDatasets with their own elements', () => {
+    const file = lib.readDicom('/tmp/vnd-synthetic-default.dcm');
+    const item0 = file.dataset['0008,1032']?.items?.[0];
+    expect(item0).toBeDefined();
+    expect(item0?.['0008,0100']).toEqual({ vr: 'SH', value: 'VND-001' });
+    expect(item0?.['0008,0102']).toEqual({ vr: 'SH', value: 'VND' });
+    expect(item0?.['0008,0104']).toEqual({
+      vr: 'LO',
+      value: 'Synthetic procedure',
+    });
+  });
+
+  it('zero-item SQ is represented as items: []', () => {
+    const file = lib.readDicom('/tmp/vnd-synthetic-default.dcm');
+    const sq = file.dataset['0040,0260'];
+    expect(sq?.vr).toBe('SQ');
+    expect(sq?.items).toEqual([]);
+  });
+
+  it('non-SQ elements have no items property', () => {
+    const file = lib.readDicom('/tmp/vnd-synthetic-default.dcm');
+    const patientName = file.dataset['0010,0010'];
+    expect(patientName?.items).toBeUndefined();
+  });
+});
+
+describe('Phase 2.3 — ergonomic helpers', () => {
+  // Single parsed file shared across helper assertions.
+  const ds = lib.readDicom('/tmp/vnd-synthetic-default.dcm').dataset;
+
+  it('Patient module helpers read documented tags', () => {
+    expect(lib.getPatientName(ds)).toBe('VibeNativeDicom^Synthetic');
+    expect(lib.getPatientID(ds)).toBe('VND-SYN-001');
+    expect(lib.getPatientBirthDate(ds)).toBe('20000101');
+    expect(lib.getPatientSex(ds)).toBe('O');
+  });
+
+  it('Study module helpers read documented tags', () => {
+    expect(lib.getStudyInstanceUID(ds)).toBe('1.2.3.4.5');
+    expect(lib.getStudyDate(ds)).toBe('20260101');
+    expect(lib.getStudyTime(ds)).toBe('120000');
+    expect(lib.getStudyDescription(ds)).toBe('VND Synthetic Study');
+    expect(lib.getAccessionNumber(ds)).toBe('VND0001');
+  });
+
+  it('Series module helpers read documented tags', () => {
+    expect(lib.getSeriesInstanceUID(ds)).toBe('1.2.3.4.5.6');
+    expect(lib.getSeriesNumber(ds)).toBe(1);
+    expect(lib.getSeriesDescription(ds)).toBe('VND Synthetic Series');
+    expect(lib.getModality(ds)).toBe('MR');
+  });
+
+  it('Image / SOP helpers read documented tags', () => {
+    expect(lib.getSOPInstanceUID({ ...ds })).toBeNull(); // tag absent in mock
+    expect(lib.getInstanceNumber(ds)).toBe(1);
+  });
+
+  it('Pixel geometry helper returns [row, col]', () => {
+    expect(lib.getPixelSpacing(ds)).toEqual([0.5, 0.5]);
+  });
+
+  it('VOI / rescale helpers parse DS values', () => {
+    expect(lib.getWindowCenter(ds)).toBe(128);
+    expect(lib.getWindowWidth(ds)).toBe(256);
+    expect(lib.getRescaleIntercept(ds)).toBe(0);
+    expect(lib.getRescaleSlope(ds)).toBe(1);
+  });
+
+  it('helpers return null for missing tags', () => {
+    const empty = {};
+    expect(lib.getPatientName(empty)).toBeNull();
+    expect(lib.getWindowCenter(empty)).toBeNull();
+    expect(lib.getPixelSpacing(empty)).toBeNull();
+    expect(lib.getModality(empty)).toBeNull();
+  });
+
+  it('helpers return null for present-but-empty tags', () => {
+    // (0008,0090) is in the mock with value: null
+    expect(
+      lib.getStudyDescription({ ...ds, '0008,1030': ds['0008,0090']! })
+    ).toBeNull();
+  });
+
+  it('helpers return null for malformed numeric values rather than NaN', () => {
+    const corrupt = {
+      '0028,1050': { vr: 'DS', value: 'not-a-number' },
+    };
+    const result = lib.getWindowCenter(corrupt);
+    expect(result).toBeNull();
+    // Critical: never return NaN — viewers would render garbage.
+    expect(Number.isNaN(result)).toBe(false);
   });
 });
