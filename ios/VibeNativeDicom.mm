@@ -16,6 +16,28 @@
   return [VibeNativeDicomImpl getGdcmVersion];
 }
 
+- (NSString *)writeSyntheticDicom {
+  NSError *error = nil;
+  NSString *path = [VibeNativeDicomImpl writeSyntheticDicomAndReturnError:&error];
+  if (path == nil) {
+    @throw [NSException exceptionWithName:@"VibeNativeDicomError"
+                                   reason:error.localizedDescription ?: @"writeSyntheticDicom failed"
+                                 userInfo:nil];
+  }
+  return path;
+}
+
+- (id)readDicom:(NSString *)path {
+  NSError *error = nil;
+  NSDictionary *result = [VibeNativeDicomImpl readDicom:path error:&error];
+  if (result == nil) {
+    @throw [NSException exceptionWithName:@"VibeNativeDicomError"
+                                   reason:error.localizedDescription ?: @"readDicom failed"
+                                 userInfo:nil];
+  }
+  return result;
+}
+
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
     (const facebook::react::ObjCTurboModule::InitParams &)params
 {

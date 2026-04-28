@@ -54,7 +54,10 @@ IDs are never reused. Once a requirement is retired it is marked **Obsolete** an
 
 ### Phase 2 — DICOM I/O
 
-> _To be added._
+| ID | Title | Description | Rationale | Acceptance | Priority | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| SR-0011 | Read DICOM file metadata + uncompressed pixel data | The package shall expose a synchronous JS function `readDicom(path: string): DicomFile` that opens a DICOM file from a local filesystem path, parses the file meta information and dataset, returns the SOP Class/Instance UIDs and transfer syntax UID, returns every top-level data element keyed by `"GGGG,EEEE"` hex, and (for Implicit VR LE / Explicit VR LE files containing PixelData) returns the uncompressed pixel buffer as base64. Compressed transfer syntaxes shall return all metadata but with `image.hasPixelData = false`; the function shall not silently return wrong pixel data. The function shall throw a JS exception on (a) unreadable / non-DICOM input or (b) GDCM-side parse failures. The same function shall return the same `transferSyntaxUID`, `sopClassUID`, `sopInstanceUID`, `dataset` keys, image attributes, and `pixelDataBase64` value on iOS and Android for the same input file. | First user-facing DICOM API; everything in Phase 3+ depends on it. The strict "throw on unreadable, leave pixels empty on unsupported syntax" rule prevents the most dangerous failure mode for diagnostic software — a viewer rendering whatever bytes it found and presenting them as the patient's image. | (i) Round-trip smoke: `writeSyntheticDicom()` followed by `readDicom()` returns the synthesized file's metadata + 256-byte uncompressed pixel buffer (16×16×8-bit) on both iOS and Android. (ii) Dataset element count ≥ 12 (the minimum required Type 1 attributes for MR Image Storage). (iii) Patient Name (0010,0010) round-trips byte-for-byte. (iv) Jest contract test asserts the documented JS surface shape. | 1 | In progress |
+| SR-0012 | Synthesize a minimal valid DICOM for round-trip testing | The package shall expose `writeSyntheticDicom(): string` that writes a 16×16 monochrome 8-bit MR Image Storage SOP file (Implicit VR LE) to platform tmpdir and returns the path. The synthesized file shall validate as a DICOM under both `gdcm::Reader` and `gdcm::ImageReader`. | Phase 2.1 ships before SR-0013 (fixture loading) so the example app and integration tests need a self-contained smoke target. | (i) The returned path is a writable file. (ii) `readDicom()` of the returned path succeeds and reports MR Image Storage (1.2.840.10008.5.1.4.1.1.4) as `sopClassUID`. | 2 | In progress |
 
 ### Subsequent phases
 
@@ -66,3 +69,4 @@ IDs are never reused. Once a requirement is retired it is marked **Obsolete** an
 | --- | --- | --- |
 | 2026-04-26 | Initial structure + Phase 0 process requirements | Vivek Sah |
 | 2026-04-26 | Refined SR-9001 description (drop test-case-ID gate, focus on SR-XXXX commit reference); seeded Phase 1 SRS (SR-0001..SR-0010) | Vivek Sah |
+| 2026-04-28 | Phase 2.1 SRS: SR-0011 (readDicom) + SR-0012 (writeSyntheticDicom). | Vivek Sah |

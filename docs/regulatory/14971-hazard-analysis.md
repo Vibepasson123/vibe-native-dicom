@@ -30,9 +30,11 @@ Concrete hazards identified for `@viveksah/vibe-native-dicom`. Severity / probab
 | H-018 | OOM on large studies | Whole-slide pathology DICOM loaded entirely → OOM crash in customer app | S2 | P4 | L | Document max-size limit; refuse files above limit until streaming added Phase 8 | _TBD_ | S2 | P2 | A | Identified |
 | H-019 | Concurrent decode causing data race | Two simultaneous decode calls share state → corrupted output | S4 | P3 | H | Native decoders made stateless or per-call instances; ThreadSanitizer in CI | _TBD_ | S4 | P1 | M | Identified |
 | H-020 | TLS validation disabled in DICOMweb client | MITM attack delivers wrong study → diagnosis on attacker-supplied data | S5 | P2 | H | TLS validation always on; no opt-out; integration test attempts to disable and asserts rejection | _TBD_ | S5 | P1 | M | Identified |
+| H-021 | readDicom returns metadata but unsupported transfer syntax silently substitutes wrong pixel data | Phase 2.1 ships uncompressed support only. If a JPEG / JPEG-2000 / JPEG-LS file were read and the implementation defaulted to "decode as raw" rather than refusing, viewer code would render garbage as the patient image — false positives or missed findings. | S5 | P3 | U | Native helper (`cpp/dicom_read.cpp::isPhase21SupportedSyntax`) whitelists Implicit VR LE + Explicit VR LE for Phase 2.1; on mismatch sets `image.hasPixelData = false` and `pixelDataBase64 = null`. TS contract documents this. Whitelist is expanded explicitly per decoder added in Phase 2.2. Acceptance: a compressed-syntax fixture must return `hasPixelData: false`. | SR-0011 | S5 | P1 | M | Identified |
 
 ## Review log
 
 | Date | Reviewer | Outcome | Notes |
 | --- | --- | --- | --- |
 | 2026-04-26 | Vivek Sah (self) | Initial pass | First 20 hazards identified. To be reviewed and expanded at each phase boundary; external regulatory consultant review at Phase 3, 6, 9 checkpoints. |
+| 2026-04-28 | Vivek Sah (self) | Phase 2.1 boundary | Added H-021 (silent pixel-data substitution on unsupported transfer syntaxes) tied to SR-0011. Mitigation implemented in `cpp/dicom_read.cpp` and verified by the example app's round-trip smoke. Existing H-004 / H-014 / H-013 / H-010 also map to SR-0011 via the traceability matrix; no scope changes there. |

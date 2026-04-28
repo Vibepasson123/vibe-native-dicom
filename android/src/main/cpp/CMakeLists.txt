@@ -28,7 +28,15 @@ endif()
 include_directories("${GDCM_PREFIX}/include/gdcm-3.2")
 link_directories("${GDCM_PREFIX}/lib")
 
-add_library(VibeNativeDicom SHARED VibeNativeDicom-jni.cpp)
+# Path to the shared C++ helpers that both iOS and Android link against.
+# CMakeLists lives at android/src/main/cpp/, so cpp/ is 4 levels up.
+set(VND_CPP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../cpp")
+include_directories("${VND_CPP_DIR}")
+
+add_library(VibeNativeDicom SHARED
+  VibeNativeDicom-jni.cpp
+  "${VND_CPP_DIR}/dicom_read.cpp"
+)
 
 # Static libs have to be ordered such that consumers come before providers,
 # but GDCM has internal cycles. --start-group / --end-group lets the linker
