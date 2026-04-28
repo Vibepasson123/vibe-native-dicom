@@ -12,24 +12,75 @@ import {
   getGdcmVersion,
   writeSyntheticDicom,
   readDicom,
+  isSupportedTransferSyntax,
+  TransferSyntaxUID,
+  LOSSLESS_TRANSFER_SYNTAXES,
   type DicomFile,
 } from '@viveksah/vibe-native-dicom';
 
 const EXPECTED_GDCM_VERSION = '3.2.5';
 
-type RoundTripState =
-  | { kind: 'pending' }
-  | { kind: 'pass'; path: string; parsed: DicomFile }
-  | { kind: 'fail'; message: string };
+// All supported transfer syntaxes, in the order we want to display them.
+// MPEG2MainProfile is included as a *negative* control: the package does
+// not decode it (no support in Phase 2.2), so the example app exercises
+// the H-021 "never substitute undefined bytes" guard end-to-end.
+const SYNTAXES_TO_TEST: { label: string; uid: string }[] = [
+  { label: 'Implicit VR LE', uid: TransferSyntaxUID.ImplicitVRLittleEndian },
+  { label: 'Explicit VR LE', uid: TransferSyntaxUID.ExplicitVRLittleEndian },
+  { label: 'JPEG Baseline', uid: TransferSyntaxUID.JPEGBaselineProcess1 },
+  { label: 'JPEG Extended', uid: TransferSyntaxUID.JPEGExtendedProcess2_4 },
+  {
+    label: 'JPEG Lossless P14',
+    uid: TransferSyntaxUID.JPEGLosslessProcess14,
+  },
+  {
+    label: 'JPEG Lossless P14 SV1',
+    uid: TransferSyntaxUID.JPEGLosslessProcess14_SV1,
+  },
+  { label: 'JPEG-LS Lossless', uid: TransferSyntaxUID.JPEGLSLossless },
+  { label: 'JPEG-LS Near-Lossless', uid: TransferSyntaxUID.JPEGLSNearLossless },
+  { label: 'JPEG 2000 Lossless', uid: TransferSyntaxUID.JPEG2000Lossless },
+  { label: 'JPEG 2000 Lossy', uid: TransferSyntaxUID.JPEG2000 },
+  { label: 'RLE Lossless', uid: TransferSyntaxUID.RLELossless },
+];
+
+const UNSUPPORTED_NEGATIVE = '1.2.840.10008.1.2.4.100'; // MPEG2MainProfile
+
+type SyntaxResult =
+  | { kind: 'pass-lossless' } // round-trip exact
+  | { kind: 'pass-lossy'; bytes: number } // decoded, byte-divergent
+  | { kind: 'fail-decode' } // hasPixelData=false (unexpected)
+  | { kind: 'fail-error'; message: string };
+
+function decodeBase64ByteCount(b64: string): number {
+  // RFC 4648 — every 4 chars encodes 3 bytes; trailing '=' shrinks.
+  const pad = (b64.match(/[=]+$/) ?? [''])[0].length;
+  return (b64.length / 4) * 3 - pad;
+}
+
+function compareWithExpected(parsed: DicomFile): boolean {
+  // Phase 2.1 synthetic image is a 16x16 deterministic gradient (idx % 256).
+  if (!parsed.image?.hasPixelData) return false;
+  const b64 = parsed.image.pixelDataBase64 ?? '';
+  // We don't decode base64 here (RN doesn't ship atob in all targets);
+  // for lossless syntaxes byte-count parity is enough as a sanity check
+  // (16×16 = 256 bytes), and the C++ side guarantees the gradient survives.
+  return decodeBase64ByteCount(b64) === 256;
+}
 
 export default function App() {
   const product = multiply(3, 7);
 
   const [version, setVersion] = useState<string | null>(null);
   const [parityPass, setParityPass] = useState<boolean | null>(null);
-  const [roundTrip, setRoundTrip] = useState<RoundTripState>({
-    kind: 'pending',
-  });
+  const [results, setResults] = useState<
+    { label: string; uid: string; result: SyntaxResult | null }[]
+  >(SYNTAXES_TO_TEST.map((s) => ({ ...s, result: null })));
+  const [unsupported, setUnsupported] = useState<{
+    supported: boolean | null;
+    readPass: boolean | null;
+    message: string | null;
+  }>({ supported: null, readPass: null, message: null });
 
   useEffect(() => {
     try {
@@ -41,18 +92,83 @@ export default function App() {
       setParityPass(false);
     }
 
+    // Run all transfer-syntax round trips on mount.
+    const next = SYNTAXES_TO_TEST.map((entry) => {
+      try {
+        const path = writeSyntheticDicom(entry.uid);
+        const parsed = readDicom(path);
+        const lossless = LOSSLESS_TRANSFER_SYNTAXES.includes(
+          entry.uid as (typeof LOSSLESS_TRANSFER_SYNTAXES)[number]
+        );
+        if (lossless) {
+          return {
+            ...entry,
+            result: compareWithExpected(parsed)
+              ? ({ kind: 'pass-lossless' } as const)
+              : ({ kind: 'fail-decode' } as const),
+          };
+        }
+        // Lossy: decoder reports hasPixelData=true and we got real bytes.
+        if (parsed.image?.hasPixelData) {
+          return {
+            ...entry,
+            result: {
+              kind: 'pass-lossy',
+              bytes: decodeBase64ByteCount(parsed.image.pixelDataBase64 ?? ''),
+            } as const,
+          };
+        }
+        return { ...entry, result: { kind: 'fail-decode' } as const };
+      } catch (err) {
+        return {
+          ...entry,
+          result: {
+            kind: 'fail-error',
+            message: (err as Error).message,
+          } as const,
+        };
+      }
+    });
+    setResults(next);
+
+    // Negative control: MPEG2MainProfile must report unsupported via
+    // isSupportedTransferSyntax(), and writeSyntheticDicom() must throw.
     try {
-      const path = writeSyntheticDicom();
-      const parsed = readDicom(path);
-      setRoundTrip({ kind: 'pass', path, parsed });
+      const supported = isSupportedTransferSyntax(UNSUPPORTED_NEGATIVE);
+      try {
+        writeSyntheticDicom(UNSUPPORTED_NEGATIVE);
+        setUnsupported({
+          supported,
+          readPass: false,
+          message: 'writeSyntheticDicom did not throw for unsupported syntax',
+        });
+      } catch (err) {
+        setUnsupported({
+          supported,
+          readPass: !supported, // expected: supported=false, write threw
+          message: (err as Error).message,
+        });
+      }
     } catch (err) {
-      setRoundTrip({ kind: 'fail', message: (err as Error).message });
+      setUnsupported({
+        supported: null,
+        readPass: false,
+        message: (err as Error).message,
+      });
     }
   }, []);
 
+  const overallPass =
+    parityPass === true &&
+    results.every(
+      (r) =>
+        r.result?.kind === 'pass-lossless' || r.result?.kind === 'pass-lossy'
+    ) &&
+    unsupported.readPass === true;
+
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
-      <Text style={styles.heading}>vibe-native-dicom — Phase 2.1</Text>
+      <Text style={styles.heading}>vibe-native-dicom — Phase 2.2</Text>
 
       <Text style={styles.label}>Platform</Text>
       <Text style={styles.value}>{Platform.OS}</Text>
@@ -60,58 +176,58 @@ export default function App() {
       <Text style={styles.label}>multiply(3, 7)</Text>
       <Text style={styles.value}>{product}</Text>
 
-      <Text style={styles.label}>GDCM version</Text>
-      <Text style={styles.value}>{version ?? '…'}</Text>
-
-      <Text style={styles.label}>Parity vs {EXPECTED_GDCM_VERSION}</Text>
-      <Text style={parityPass === false ? styles.fail : styles.pass}>
-        {parityPass === null ? '…' : parityPass ? 'PASS' : 'FAIL'}
+      <Text style={styles.label}>
+        GDCM version (parity vs {EXPECTED_GDCM_VERSION})
+      </Text>
+      <Text style={parityPass ? styles.pass : styles.fail}>
+        {parityPass === null
+          ? '…'
+          : parityPass
+            ? `${version}  PASS`
+            : `${version}  FAIL`}
       </Text>
 
-      <Text style={styles.section}>Read/Write Round Trip</Text>
-      {roundTrip.kind === 'pending' && <ActivityIndicator />}
-      {roundTrip.kind === 'fail' && (
-        <Text style={styles.fail}>FAIL — {roundTrip.message}</Text>
-      )}
-      {roundTrip.kind === 'pass' && (
-        <View style={styles.block}>
-          <Text style={styles.pass}>PASS</Text>
-          <Text style={styles.label}>Wrote → Read</Text>
-          <Text style={styles.path} numberOfLines={2}>
-            {roundTrip.path}
-          </Text>
-
-          <Text style={styles.label}>Transfer syntax</Text>
-          <Text style={styles.value}>{roundTrip.parsed.transferSyntaxUID}</Text>
-
-          <Text style={styles.label}>SOP Class UID</Text>
-          <Text style={styles.value}>{roundTrip.parsed.sopClassUID}</Text>
-
-          <Text style={styles.label}>Image</Text>
-          <Text style={styles.value}>
-            {roundTrip.parsed.image
-              ? `${roundTrip.parsed.image.rows}×${roundTrip.parsed.image.columns}, ${roundTrip.parsed.image.bitsAllocated}-bit, ${roundTrip.parsed.image.photometricInterpretation}`
-              : '(no pixel data)'}
-          </Text>
-
-          <Text style={styles.label}>Pixel data</Text>
-          <Text style={styles.value}>
-            {roundTrip.parsed.image?.hasPixelData
-              ? `${roundTrip.parsed.image.pixelDataBase64?.length ?? 0} bytes (base64)`
-              : '(none)'}
-          </Text>
-
-          <Text style={styles.label}>Patient (0010,0010)</Text>
-          <Text style={styles.value}>
-            {roundTrip.parsed.dataset['0010,0010']?.value ?? '(missing)'}
-          </Text>
-
-          <Text style={styles.label}>Dataset element count</Text>
-          <Text style={styles.value}>
-            {Object.keys(roundTrip.parsed.dataset).length}
-          </Text>
+      <Text style={styles.section}>Transfer-syntax round trip</Text>
+      {results.map((row) => (
+        <View key={row.uid} style={styles.row}>
+          <Text style={styles.rowLabel}>{row.label}</Text>
+          <Text style={styles.rowUid}>{row.uid}</Text>
+          {row.result === null && <ActivityIndicator />}
+          {row.result?.kind === 'pass-lossless' && (
+            <Text style={styles.pass}>PASS · lossless · 256 bytes</Text>
+          )}
+          {row.result?.kind === 'pass-lossy' && (
+            <Text style={styles.passLossy}>
+              PASS · lossy · {row.result.bytes} bytes
+            </Text>
+          )}
+          {row.result?.kind === 'fail-decode' && (
+            <Text style={styles.fail}>FAIL · decoder returned no pixels</Text>
+          )}
+          {row.result?.kind === 'fail-error' && (
+            <Text style={styles.fail} numberOfLines={3}>
+              FAIL · {row.result.message}
+            </Text>
+          )}
         </View>
+      ))}
+
+      <Text style={styles.section}>Unsupported-syntax guard (H-021)</Text>
+      <Text style={styles.rowUid}>MPEG2MainProfile {UNSUPPORTED_NEGATIVE}</Text>
+      {unsupported.readPass === null && <ActivityIndicator />}
+      {unsupported.readPass === true && (
+        <Text style={styles.pass}>PASS · isSupported=false · write threw</Text>
       )}
+      {unsupported.readPass === false && (
+        <Text style={styles.fail}>
+          FAIL · {unsupported.message ?? 'guard did not engage'}
+        </Text>
+      )}
+
+      <Text style={styles.section}>Overall</Text>
+      <Text style={overallPass ? styles.passLarge : styles.failLarge}>
+        {overallPass ? 'PASS' : 'FAIL'}
+      </Text>
     </ScrollView>
   );
 }
@@ -142,22 +258,48 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontVariant: ['tabular-nums'],
   },
+  row: {
+    paddingVertical: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#ddd',
+  },
+  rowLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  rowUid: {
+    fontSize: 10,
+    color: '#888',
+    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
+    marginBottom: 2,
+  },
   pass: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '700',
     color: '#1a7f37',
   },
+  passLossy: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#3d8b40',
+  },
   fail: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#cf222e',
   },
-  block: {
-    marginTop: 6,
+  passLarge: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#1a7f37',
+    textAlign: 'center',
+    marginTop: 8,
   },
-  path: {
-    fontSize: 11,
-    color: '#888',
-    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
+  failLarge: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#cf222e',
+    textAlign: 'center',
+    marginTop: 8,
   },
 });

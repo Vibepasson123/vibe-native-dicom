@@ -75,14 +75,24 @@ static NSError *makeError(const std::string &msg) {
 }
 
 + (BOOL)writeSyntheticDicomAtPath:(NSString *)path
+                transferSyntaxUID:(NSString *)transferSyntaxUID
                             error:(NSError **)error {
   try {
-    vnd::writeSyntheticDicomFile(std::string([path UTF8String]));
+    vnd::writeSyntheticDicomFile(
+        std::string([path UTF8String]),
+        std::string([transferSyntaxUID UTF8String]));
     return YES;
   } catch (const std::exception &e) {
     if (error) *error = makeError(e.what());
     return NO;
   }
+}
+
++ (BOOL)isSupportedTransferSyntax:(NSString *)transferSyntaxUID {
+  return vnd::isSupportedTransferSyntax(
+             std::string([transferSyntaxUID UTF8String]))
+             ? YES
+             : NO;
 }
 
 @end

@@ -15,12 +15,21 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
     return nativeGetGdcmVersion()
   }
 
-  override fun writeSyntheticDicom(): String {
+  override fun writeSyntheticDicom(transferSyntaxUID: String): String {
     // The example app cleans this up; we don't auto-delete in case the
-    // caller wants to inspect the file.
+    // caller wants to inspect the file. Filename includes the transfer
+    // syntax UID so per-syntax round trips don't overwrite each other.
     val dir = reactApplicationContext.cacheDir
-    val file = java.io.File(dir, "vnd-synthetic-${System.currentTimeMillis()}.dcm")
-    return nativeWriteSyntheticDicom(file.absolutePath)
+    val tag = if (transferSyntaxUID.isEmpty()) "default" else transferSyntaxUID
+    val file = java.io.File(
+      dir,
+      "vnd-synthetic-${tag}-${System.currentTimeMillis()}.dcm"
+    )
+    return nativeWriteSyntheticDicom(file.absolutePath, transferSyntaxUID)
+  }
+
+  override fun isSupportedTransferSyntax(transferSyntaxUID: String): Boolean {
+    return nativeIsSupportedTransferSyntax(transferSyntaxUID)
   }
 
   override fun readDicom(path: String): WritableMap {
@@ -33,7 +42,13 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
   // android/src/main/cpp/VibeNativeDicom-jni.cpp). Loaded by the static
   // initializer below.
   private external fun nativeGetGdcmVersion(): String
-  private external fun nativeWriteSyntheticDicom(path: String): String
+  private external fun nativeWriteSyntheticDicom(
+    path: String,
+    transferSyntaxUID: String
+  ): String
+  private external fun nativeIsSupportedTransferSyntax(
+    transferSyntaxUID: String
+  ): Boolean
   private external fun nativeReadDicom(path: String): Any
 
   companion object {

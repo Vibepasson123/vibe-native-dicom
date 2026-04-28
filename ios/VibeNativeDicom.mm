@@ -16,15 +16,20 @@
   return [VibeNativeDicomImpl getGdcmVersion];
 }
 
-- (NSString *)writeSyntheticDicom {
+- (NSString *)writeSyntheticDicom:(NSString *)transferSyntaxUID {
   NSError *error = nil;
-  NSString *path = [VibeNativeDicomImpl writeSyntheticDicomAndReturnError:&error];
+  NSString *path = [VibeNativeDicomImpl writeSyntheticDicom:transferSyntaxUID
+                                                      error:&error];
   if (path == nil) {
     @throw [NSException exceptionWithName:@"VibeNativeDicomError"
                                    reason:error.localizedDescription ?: @"writeSyntheticDicom failed"
                                  userInfo:nil];
   }
   return path;
+}
+
+- (NSNumber *)isSupportedTransferSyntax:(NSString *)transferSyntaxUID {
+  return [VibeNativeDicomImpl isSupportedTransferSyntax:transferSyntaxUID];
 }
 
 - (id)readDicom:(NSString *)path {

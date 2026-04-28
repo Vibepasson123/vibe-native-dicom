@@ -77,7 +77,7 @@ Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeGetGdcmVersion(
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeWriteSyntheticDicom(
-    JNIEnv* env, jobject /* this */, jstring jPath) {
+    JNIEnv* env, jobject /* this */, jstring jPath, jstring jTsUID) {
   const char* cPath = env->GetStringUTFChars(jPath, nullptr);
   if (cPath == nullptr) {
     throwJavaRuntime(env, "writeSyntheticDicom: null path");
@@ -85,13 +85,34 @@ Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeWriteSyntheticDico
   }
   std::string path(cPath);
   env->ReleaseStringUTFChars(jPath, cPath);
+
+  std::string tsUID;
+  if (jTsUID != nullptr) {
+    const char* cTs = env->GetStringUTFChars(jTsUID, nullptr);
+    if (cTs != nullptr) {
+      tsUID.assign(cTs);
+      env->ReleaseStringUTFChars(jTsUID, cTs);
+    }
+  }
+
   try {
-    vnd::writeSyntheticDicomFile(path);
+    vnd::writeSyntheticDicomFile(path, tsUID);
   } catch (const std::exception& e) {
     throwJavaRuntime(env, e.what());
     return nullptr;
   }
   return env->NewStringUTF(path.c_str());
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeIsSupportedTransferSyntax(
+    JNIEnv* env, jobject /* this */, jstring jTsUID) {
+  if (jTsUID == nullptr) return JNI_FALSE;
+  const char* cTs = env->GetStringUTFChars(jTsUID, nullptr);
+  if (cTs == nullptr) return JNI_FALSE;
+  std::string tsUID(cTs);
+  env->ReleaseStringUTFChars(jTsUID, cTs);
+  return vnd::isSupportedTransferSyntax(tsUID) ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT jobject JNICALL

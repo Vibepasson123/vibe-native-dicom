@@ -11,6 +11,7 @@
 #include "gdcmDataSet.h"
 #include "gdcmFile.h"
 #include "gdcmImage.h"
+#include "gdcmImageChangeTransferSyntax.h"
 #include "gdcmImageReader.h"
 #include "gdcmImageWriter.h"
 #include "gdcmReader.h"
@@ -21,13 +22,52 @@
 namespace vnd {
 namespace {
 
-// Phase 2.1 supports the two ubiquitous uncompressed transfer syntaxes.
-// Anything else is rejected with a clear error so callers don't get
-// silently-wrong pixel data.
-bool isPhase21SupportedSyntax(const gdcm::TransferSyntax& ts) {
+// Single source of truth for the Phase 2.2 transfer-syntax whitelist. Each
+// entry is { canonical UID string, GDCM TSType }. New decoders are added
+// here in lock-step with native-build / fixture / test work — never
+// silently expand on the read side without the matching test fixture.
+struct SupportedTS {
+  const char* uid;
+  gdcm::TransferSyntax::TSType type;
+};
+
+const SupportedTS kSupportedSyntaxes[] = {
+    {"1.2.840.10008.1.2",
+     gdcm::TransferSyntax::ImplicitVRLittleEndian},
+    {"1.2.840.10008.1.2.1",
+     gdcm::TransferSyntax::ExplicitVRLittleEndian},
+    {"1.2.840.10008.1.2.4.50",
+     gdcm::TransferSyntax::JPEGBaselineProcess1},
+    {"1.2.840.10008.1.2.4.51",
+     gdcm::TransferSyntax::JPEGExtendedProcess2_4},
+    {"1.2.840.10008.1.2.4.57",
+     gdcm::TransferSyntax::JPEGLosslessProcess14},
+    {"1.2.840.10008.1.2.4.70",
+     gdcm::TransferSyntax::JPEGLosslessProcess14_1},
+    {"1.2.840.10008.1.2.4.80", gdcm::TransferSyntax::JPEGLSLossless},
+    {"1.2.840.10008.1.2.4.81", gdcm::TransferSyntax::JPEGLSNearLossless},
+    {"1.2.840.10008.1.2.4.90", gdcm::TransferSyntax::JPEG2000Lossless},
+    {"1.2.840.10008.1.2.4.91", gdcm::TransferSyntax::JPEG2000},
+    {"1.2.840.10008.1.2.5", gdcm::TransferSyntax::RLELossless},
+};
+
+bool isSupportedSyntax(const gdcm::TransferSyntax& ts) {
   const gdcm::TransferSyntax::TSType t = ts;
-  return t == gdcm::TransferSyntax::ImplicitVRLittleEndian ||
-         t == gdcm::TransferSyntax::ExplicitVRLittleEndian;
+  for (const auto& entry : kSupportedSyntaxes) {
+    if (entry.type == t) return true;
+  }
+  return false;
+}
+
+bool tsTypeFromUID(const std::string& uid,
+                   gdcm::TransferSyntax::TSType& outType) {
+  for (const auto& entry : kSupportedSyntaxes) {
+    if (uid == entry.uid) {
+      outType = entry.type;
+      return true;
+    }
+  }
+  return false;
 }
 
 std::string formatTagKey(const gdcm::Tag& tag) {
@@ -160,10 +200,13 @@ void readDicomFile(const std::string& path, DicomFile& out) {
     return;  // legitimate — SR documents, presentation states, etc.
   }
 
-  // Phase 2.1: only Implicit/Explicit VR LE. Anything else, return the
-  // metadata but leave hasPixelData=false. Callers can still use the
-  // image attributes for layout; pixel decode is Phase 2.2.
-  if (!isPhase21SupportedSyntax(ts)) {
+  // Phase 2.2: whitelist now includes uncompressed + JPEG family +
+  // JPEG-LS + JPEG 2000 + RLE. Anything else (MPEG, big-endian,
+  // HTJ2K, JPIP-Referenced, Deflated) returns the metadata but leaves
+  // hasPixelData=false. Callers can still use the image attributes
+  // for layout; the contract is "never substitute undefined bytes for
+  // an unsupported syntax" (hazard H-021).
+  if (!isSupportedSyntax(ts)) {
     return;
   }
 
@@ -191,14 +234,36 @@ void readDicomFile(const std::string& path, DicomFile& out) {
   out.image.hasPixelData = true;
 }
 
-void writeSyntheticDicomFile(const std::string& path) {
-  // 16x16 monochrome 8-bit MR image, all pixels = 128. Implicit VR LE
-  // (the default-when-unspecified DICOM transfer syntax). Minimal meta
-  // group — just enough to validate.
+bool isSupportedTransferSyntax(const std::string& transferSyntaxUID) {
+  gdcm::TransferSyntax::TSType ignored;
+  return tsTypeFromUID(transferSyntaxUID, ignored);
+}
+
+void writeSyntheticDicomFile(const std::string& path,
+                             const std::string& transferSyntaxUID) {
+  // Resolve target transfer syntax. Empty string keeps the historical
+  // Phase 2.1 default (Implicit VR LE).
+  gdcm::TransferSyntax::TSType targetType =
+      gdcm::TransferSyntax::ImplicitVRLittleEndian;
+  if (!transferSyntaxUID.empty()) {
+    if (!tsTypeFromUID(transferSyntaxUID, targetType)) {
+      throw std::runtime_error(
+          std::string("writeSyntheticDicom: unsupported transfer syntax UID: ")
+          + transferSyntaxUID);
+    }
+  }
+
+  // 16×16 monochrome 8-bit MR image. Pixels are a deterministic gradient
+  // (idx % 256) so consumers can verify byte-for-byte round-trip integrity
+  // for lossless syntaxes. For lossy syntaxes the image is coarse enough
+  // (256 px) that JPEG Baseline still has plenty to work with.
   const int kRows = 16;
   const int kCols = 16;
   const int kBytes = kRows * kCols;
-  std::vector<unsigned char> pixels(kBytes, 128);
+  std::vector<unsigned char> pixels(kBytes);
+  for (int i = 0; i < kBytes; ++i) {
+    pixels[i] = static_cast<unsigned char>(i & 0xFF);
+  }
 
   gdcm::Image img;
   img.SetNumberOfDimensions(2);
@@ -208,6 +273,8 @@ void writeSyntheticDicomFile(const std::string& path) {
       gdcm::PhotometricInterpretation::MONOCHROME2);
   img.GetPixelFormat().SetSamplesPerPixel(1);
   img.SetPixelFormat(gdcm::PixelFormat::UINT8);
+  // Build the *source* image as Implicit VR LE. If the target is
+  // compressed we'll convert via ImageChangeTransferSyntax below.
   img.SetTransferSyntax(gdcm::TransferSyntax::ImplicitVRLittleEndian);
 
   gdcm::DataElement pixelData(gdcm::Tag(0x7FE0, 0x0010));
@@ -215,9 +282,33 @@ void writeSyntheticDicomFile(const std::string& path) {
                          static_cast<uint32_t>(pixels.size()));
   img.SetDataElement(pixelData);
 
+  // If the caller asked for a compressed syntax, run the source image
+  // through GDCM's encoder pipeline. We use the bundled libjpeg-turbo /
+  // CharLS / OpenJPEG via gdcmjpeg* / gdcmcharls / gdcmopenjp2 — the
+  // ImageChangeTransferSyntax filter handles codec dispatch internally.
+  const bool needsRecompress =
+      targetType != gdcm::TransferSyntax::ImplicitVRLittleEndian &&
+      targetType != gdcm::TransferSyntax::ExplicitVRLittleEndian;
+
+  gdcm::Image outImg;
+  if (needsRecompress) {
+    gdcm::ImageChangeTransferSyntax change;
+    change.SetTransferSyntax(gdcm::TransferSyntax(targetType));
+    change.SetInput(img);
+    if (!change.Change()) {
+      throw std::runtime_error(
+          std::string("writeSyntheticDicom: GDCM failed to encode to ")
+          + transferSyntaxUID);
+    }
+    outImg = change.GetOutput();
+  } else {
+    outImg = img;
+    outImg.SetTransferSyntax(gdcm::TransferSyntax(targetType));
+  }
+
   gdcm::ImageWriter writer;
   writer.SetFileName(path.c_str());
-  writer.SetImage(img);
+  writer.SetImage(outImg);
 
   // Required Type 1 attributes for MR Image Storage. Without these GDCM
   // refuses to write.

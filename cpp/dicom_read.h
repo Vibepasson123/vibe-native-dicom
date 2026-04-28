@@ -42,9 +42,14 @@ struct DicomImage {
   std::string photometricInterpretation;
   int numberOfFrames;
 
-  // Uncompressed pixel data, encoded as base64. Empty when the dataset has
-  // no PixelData (e.g. Structured Reports) or when the transfer syntax is
-  // compressed (Phase 2.2 will decode these).
+  // Uncompressed pixel data (post-decode), encoded as base64. Empty when
+  // the dataset has no PixelData (e.g. Structured Reports) or when the
+  // transfer syntax is unsupported by the current Phase. For lossy
+  // transfer syntaxes (JPEG Baseline / Extended / JPEG-LS Near-Lossless /
+  // JPEG 2000 lossy) the bytes here are the GDCM-decoded result and will
+  // not byte-match the input image; for lossless syntaxes (Implicit/
+  // Explicit VR LE, JPEG Lossless P14, JPEG-LS Lossless, JPEG 2000
+  // Lossless, RLE Lossless) the bytes round-trip exactly.
   std::string pixelDataBase64;
 
   // True when the dataset has a PixelData (7FE0,0010) element AND we were
@@ -67,16 +72,44 @@ struct DicomFile {
 // on:
 //   - file unreadable / not present
 //   - file is not a valid DICOM (no preamble + DICM magic)
-//   - transfer syntax is one we don't yet support (Phase 2.1: Implicit VR
-//     Little Endian + Explicit VR Little Endian only).
-// All other DICOM parse errors are surfaced as runtime_errors with a
-// human-readable message.
+// For unsupported transfer syntaxes the function returns successfully with
+// the metadata populated but `image.hasPixelData = false` and
+// `pixelDataBase64` empty — the caller MUST check `hasPixelData` before
+// rendering. This is a deliberate safety contract: never substitute
+// undefined bytes when we can't decode the actual pixel stream
+// (hazard H-021).
+//
+// Supported transfer syntaxes for pixel-data extraction (Phase 2.2):
+//   - Implicit VR Little Endian            (1.2.840.10008.1.2)
+//   - Explicit VR Little Endian            (1.2.840.10008.1.2.1)
+//   - JPEG Baseline (Process 1)            (1.2.840.10008.1.2.4.50)
+//   - JPEG Extended (Process 2 & 4)        (1.2.840.10008.1.2.4.51)
+//   - JPEG Lossless, Non-Hierarchical (P14)(1.2.840.10008.1.2.4.57)
+//   - JPEG Lossless, SV1   (Process 14, SV1)(1.2.840.10008.1.2.4.70)
+//   - JPEG-LS Lossless                     (1.2.840.10008.1.2.4.80)
+//   - JPEG-LS Lossy (Near-Lossless)        (1.2.840.10008.1.2.4.81)
+//   - JPEG 2000 Lossless                   (1.2.840.10008.1.2.4.90)
+//   - JPEG 2000                            (1.2.840.10008.1.2.4.91)
+//   - RLE Lossless                         (1.2.840.10008.1.2.5)
+// Unsupported (returns metadata + hasPixelData=false): MPEG family, big-
+// endian (rare/deprecated), Deflated, HTJ2K, JPIP-Referenced.
 void readDicomFile(const std::string& path, DicomFile& out);
 
-// Writes a minimal valid DICOM file (16x16 monochrome MR, Implicit VR LE,
-// SOP Class "MR Image Storage") to `path`. Used by the example app's
-// round-trip smoke test before SR-0012 ships fixture loading. Throws
-// std::runtime_error on write failure.
-void writeSyntheticDicomFile(const std::string& path);
+// Returns true when the given DICOM transfer-syntax UID is on the Phase 2.2
+// decode whitelist (see readDicomFile docstring for the list). Exposed so
+// callers / tests can probe support without needing to read a file.
+bool isSupportedTransferSyntax(const std::string& transferSyntaxUID);
+
+// Writes a minimal valid DICOM (16x16 monochrome 8-bit MR Image Storage)
+// to `path` in the given transfer syntax. `transferSyntaxUID` must be one
+// of the values returned true by isSupportedTransferSyntax(); otherwise
+// throws std::runtime_error. An empty `transferSyntaxUID` defaults to
+// Implicit VR Little Endian (the historical Phase 2.1 behaviour).
+//
+// The pixel data is a deterministic 256-byte gradient (idx % 256) so
+// consumers can verify byte-for-byte round-trip integrity for lossless
+// syntaxes.
+void writeSyntheticDicomFile(const std::string& path,
+                             const std::string& transferSyntaxUID = "");
 
 }  // namespace vnd

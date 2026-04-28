@@ -25,11 +25,18 @@ NS_ASSUME_NONNULL_BEGIN
 + (nullable NSDictionary *)readDicomAtPath:(NSString *)path
                                      error:(NSError **)error;
 
-// Writes a minimal valid DICOM file (16x16 monochrome MR, Implicit VR LE)
-// to `path`. Returns YES on success; on failure returns NO and populates
-// `error`.
+// Writes a minimal valid synthetic DICOM (16x16 monochrome MR) to `path`
+// in the given transfer syntax. Empty string defaults to Implicit VR LE
+// (Phase 2.1 behaviour). Returns YES on success; on failure (unsupported
+// syntax, encode failure, write failure) returns NO and populates `error`.
 + (BOOL)writeSyntheticDicomAtPath:(NSString *)path
+                transferSyntaxUID:(NSString *)transferSyntaxUID
                             error:(NSError **)error;
+
+// Returns YES when the package can decode pixel data for the given
+// DICOM transfer-syntax UID. Stays in sync with the C++ kSupportedSyntaxes
+// table.
++ (BOOL)isSupportedTransferSyntax:(NSString *)transferSyntaxUID;
 
 @end
 
