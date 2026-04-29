@@ -1,5 +1,24 @@
 import { describe, it, expect, jest } from '@jest/globals';
 
+// @shopify/react-native-skia ships ESM that Jest can't transform out of
+// the box. The library doesn't run any Skia code under tests — we only
+// need the import to resolve. Replace the whole module with stubs.
+jest.mock('@shopify/react-native-skia', () => ({
+  __esModule: true,
+  AlphaType: { Opaque: 1 },
+  ColorType: { RGBA_8888: 4 },
+  Canvas: () => null,
+  Fill: () => null,
+  Image: () => null,
+  Shader: () => null,
+  ImageShader: () => null,
+  Skia: {
+    RuntimeEffect: { Make: () => null },
+    Data: { fromBytes: () => null },
+    Image: { MakeImage: () => null },
+  },
+}));
+
 // Stub the TurboModule before importing the library, so the native-resolved
 // implementations (multiply.native.tsx / getGdcmVersion.native.tsx /
 // readDicom.native.tsx) can run in node without a host. This validates the

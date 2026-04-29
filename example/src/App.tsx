@@ -20,6 +20,8 @@ import {
   type PixelDataInfo,
   // Phase 3.1 — viewer
   DicomImageView,
+  // Phase 3.2 — Skia/GPU viewer
+  DicomImageViewSkia,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -121,6 +123,11 @@ export default function App() {
     pngBytes: number;
   } | null>(null);
   const [viewerErr, setViewerErr] = useState<string | null>(null);
+  // Phase 3.2 Skia viewer telemetry — texture upload happens once.
+  const [skiaUpload, setSkiaUpload] = useState<{ uploadMs: number } | null>(
+    null
+  );
+  const [skiaErr, setSkiaErr] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -474,6 +481,39 @@ export default function App() {
             </Text>
           )}
           {viewerErr && <Text style={styles.fail}>FAIL · {viewerErr}</Text>}
+        </View>
+      ) : (
+        <Text style={styles.label}>Waiting for pixel data…</Text>
+      )}
+
+      <Text style={styles.section}>GPU viewer (Phase 3.2 · Skia)</Text>
+      {perf?.info.hasPixelData ? (
+        <View style={styles.block}>
+          <Text style={styles.label}>
+            Same W/L sliders above drive both viewers.
+          </Text>
+          <View style={styles.viewerWrapper}>
+            <DicomImageViewSkia
+              filePath={perf.info.filePath}
+              rows={perf.info.rows}
+              columns={perf.info.columns}
+              bitsAllocated={perf.info.bitsAllocated}
+              photometricInterpretation={perf.info.photometricInterpretation}
+              windowCenter={wc}
+              windowWidth={ww}
+              width={256}
+              height={256}
+              onReady={(info) => setSkiaUpload(info)}
+              onError={(err) => setSkiaErr(err.message)}
+            />
+          </View>
+          {skiaUpload && (
+            <Text style={styles.label}>
+              texture uploaded in {skiaUpload.uploadMs} ms · W/L applied on GPU
+              per frame
+            </Text>
+          )}
+          {skiaErr && <Text style={styles.fail}>FAIL · {skiaErr}</Text>}
         </View>
       ) : (
         <Text style={styles.label}>Waiting for pixel data…</Text>

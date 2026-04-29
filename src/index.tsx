@@ -6,10 +6,13 @@ export {
   isSupportedTransferSyntax,
   extractPixelDataToFile,
 } from './readDicom';
-// Phase 3.1 — viewer surface
+// Phase 3.1 — viewer surface (pure JS PNG path)
+// Phase 3.2 — Skia GPU path (optional peer dep)
 export {
   DicomImageView,
   type DicomImageViewProps,
+  DicomImageViewSkia,
+  type DicomImageViewSkiaProps,
   applyWindowLevel,
   type WindowLevelInput,
   bytesFromLatin1,
