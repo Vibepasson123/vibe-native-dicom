@@ -4,12 +4,14 @@ export {
   readDicom,
   writeSyntheticDicom,
   isSupportedTransferSyntax,
+  extractPixelDataToFile,
 } from './readDicom';
 export type {
   DicomElement,
   DicomDataset,
   DicomImage,
   DicomFile,
+  PixelDataInfo,
 } from './types';
 export {
   TransferSyntaxUID,

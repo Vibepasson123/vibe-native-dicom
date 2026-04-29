@@ -116,4 +116,29 @@ static NSDictionary *datasetToDictionary(const vnd::DicomDataset &ds) {
              : NO;
 }
 
++ (nullable NSDictionary *)extractPixelDataAtPath:(NSString *)dicomPath
+                                            toPath:(NSString *)outPath
+                                             error:(NSError **)error {
+  vnd::PixelDataInfo info;
+  try {
+    vnd::extractPixelDataToFile(std::string([dicomPath UTF8String]),
+                                std::string([outPath UTF8String]), info);
+  } catch (const std::exception &e) {
+    if (error) *error = makeError(e.what());
+    return nil;
+  }
+  return @{
+    @"filePath": [NSString stringWithUTF8String:info.filePath.c_str()],
+    @"byteLength": @(static_cast<double>(info.byteLength)),
+    @"rows": @(info.rows),
+    @"columns": @(info.columns),
+    @"bitsAllocated": @(info.bitsAllocated),
+    @"samplesPerPixel": @(info.samplesPerPixel),
+    @"photometricInterpretation":
+        [NSString stringWithUTF8String:info.photometricInterpretation.c_str()],
+    @"numberOfFrames": @(info.numberOfFrames),
+    @"hasPixelData": @(info.hasPixelData),
+  };
+}
+
 @end

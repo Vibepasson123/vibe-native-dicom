@@ -126,4 +126,41 @@ bool isSupportedTransferSyntax(const std::string& transferSyntaxUID);
 void writeSyntheticDicomFile(const std::string& path,
                              const std::string& transferSyntaxUID = "");
 
+// Result of extractPixelDataToFile — what the JS layer actually needs to
+// know about the raw pixel buffer (everything except the bytes themselves,
+// which live at outPath).
+struct PixelDataInfo {
+  // Absolute path on disk to a binary file containing the raw uncompressed
+  // pixel buffer. Owned by the caller; delete when done. Empty when the
+  // input had no pixel data or used an unsupported transfer syntax.
+  std::string filePath;
+  // Length in bytes of the file at filePath.
+  long long byteLength;
+  // Geometry duplicated from DicomImage so callers don't need a second
+  // readDicom() call to render.
+  int rows;
+  int columns;
+  int bitsAllocated;
+  int samplesPerPixel;
+  std::string photometricInterpretation;
+  int numberOfFrames;
+  // True iff bytes were successfully written. False (and byteLength=0,
+  // filePath="") for files with no PixelData or unsupported transfer syntax.
+  bool hasPixelData;
+};
+
+// Reads `dicomPath`, decodes its pixel data per the same rules as
+// readDicomFile, and writes the raw uncompressed pixels to `outPath`.
+// Returns the geometry + path metadata in `out`. Bytes never traverse
+// the JSI bridge — large CTs / MRs round-trip through the filesystem
+// instead of base64-bloating the JS heap. Throws std::runtime_error
+// if the DICOM file is unreadable or the output file can't be written.
+//
+// On unsupported transfer syntaxes the function succeeds but
+// out.hasPixelData = false and no file is written; callers should check
+// the flag before reading outPath.
+void extractPixelDataToFile(const std::string& dicomPath,
+                            const std::string& outPath,
+                            PixelDataInfo& out);
+
 }  // namespace vnd

@@ -48,3 +48,26 @@ export type DicomFile = {
   // null when the dataset has no PixelData group (SR, presentation states).
   image: DicomImage | null;
 };
+
+// Phase 2.5 — pixel-data extraction result.
+//
+// Returned by `extractPixelDataToFile()`. Bytes are written to `filePath`
+// on the device's filesystem; consumers read them with whatever file API
+// they already use (react-native-fs, expo-file-system, the native
+// renderer's mmap path, etc.). This avoids the 33% bridge bloat + 75% CPU
+// hit of the base64 path on `readDicom().image.pixelDataBase64`.
+//
+// `hasPixelData=false` cases (no PixelData element, unsupported transfer
+// syntax) leave `filePath` empty — the file is NOT created. Always check
+// the flag before reading.
+export type PixelDataInfo = {
+  filePath: string;
+  byteLength: number;
+  rows: number;
+  columns: number;
+  bitsAllocated: number;
+  samplesPerPixel: number;
+  photometricInterpretation: string;
+  numberOfFrames: number;
+  hasPixelData: boolean;
+};

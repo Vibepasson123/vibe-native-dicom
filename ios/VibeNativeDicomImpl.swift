@@ -43,4 +43,15 @@ import Foundation
     let dict = try GdcmBridge.readDicom(atPath: path as String)
     return dict as NSDictionary
   }
+
+  @objc public static func extractPixelDataToFile(
+    _ dicomPath: NSString,
+    outPath: NSString
+  ) throws -> NSDictionary {
+    let dict = try GdcmBridge.extractPixelData(
+      atPath: dicomPath as String,
+      toPath: outPath as String
+    )
+    return dict as NSDictionary
+  }
 }

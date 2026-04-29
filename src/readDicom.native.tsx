@@ -1,5 +1,5 @@
 import VibeNativeDicom from './NativeVibeNativeDicom';
-import type { DicomFile } from './types';
+import type { DicomFile, PixelDataInfo } from './types';
 
 export function readDicom(path: string): DicomFile {
   // The native module returns an UnsafeObject on the JSI side — we trust the
@@ -14,4 +14,14 @@ export function writeSyntheticDicom(transferSyntaxUID: string = ''): string {
 
 export function isSupportedTransferSyntax(transferSyntaxUID: string): boolean {
   return VibeNativeDicom.isSupportedTransferSyntax(transferSyntaxUID);
+}
+
+export function extractPixelDataToFile(
+  dicomPath: string,
+  outPath: string
+): PixelDataInfo {
+  return VibeNativeDicom.extractPixelDataToFile(
+    dicomPath,
+    outPath
+  ) as PixelDataInfo;
 }

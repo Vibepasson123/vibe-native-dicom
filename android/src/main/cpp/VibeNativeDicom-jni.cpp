@@ -175,6 +175,68 @@ Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeIsSupportedTransfe
 }
 
 extern "C" JNIEXPORT jobject JNICALL
+Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeExtractPixelDataToFile(
+    JNIEnv* env, jobject /* this */, jstring jDicomPath, jstring jOutPath) {
+  if (jDicomPath == nullptr || jOutPath == nullptr) {
+    throwJavaRuntime(env, "extractPixelDataToFile: null path");
+    return nullptr;
+  }
+  const char* cDicom = env->GetStringUTFChars(jDicomPath, nullptr);
+  const char* cOut = env->GetStringUTFChars(jOutPath, nullptr);
+  if (cDicom == nullptr || cOut == nullptr) {
+    if (cDicom) env->ReleaseStringUTFChars(jDicomPath, cDicom);
+    if (cOut) env->ReleaseStringUTFChars(jOutPath, cOut);
+    throwJavaRuntime(env, "extractPixelDataToFile: bad path encoding");
+    return nullptr;
+  }
+  std::string dicomPath(cDicom);
+  std::string outPath(cOut);
+  env->ReleaseStringUTFChars(jDicomPath, cDicom);
+  env->ReleaseStringUTFChars(jOutPath, cOut);
+
+  vnd::PixelDataInfo info;
+  try {
+    vnd::extractPixelDataToFile(dicomPath, outPath, info);
+  } catch (const std::exception& e) {
+    throwJavaRuntime(env, e.what());
+    return nullptr;
+  }
+
+  jclass mapCls = env->FindClass("java/util/HashMap");
+  jmethodID mapCtor = env->GetMethodID(mapCls, "<init>", "()V");
+  jmethodID putMethod = env->GetMethodID(
+      mapCls, "put",
+      "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+
+  jobject root = newHashMap(env, mapCls, mapCtor);
+  putString(env, root, putMethod, "filePath", info.filePath);
+  // byteLength is a long long (DICOMs can exceed 2 GB on whole-slide
+  // pathology). We marshal it as a Java Double to survive the WritableMap
+  // round trip — JS Number is f64 so precision is fine up to 2^53.
+  {
+    jstring k = env->NewStringUTF("byteLength");
+    jclass dblCls = env->FindClass("java/lang/Double");
+    jmethodID dblCtor = env->GetMethodID(dblCls, "<init>", "(D)V");
+    jobject jVal = env->NewObject(dblCls, dblCtor,
+                                  static_cast<jdouble>(info.byteLength));
+    env->CallObjectMethod(root, putMethod, k, jVal);
+    env->DeleteLocalRef(k);
+    env->DeleteLocalRef(jVal);
+    env->DeleteLocalRef(dblCls);
+  }
+  putInt(env, root, putMethod, "rows", info.rows);
+  putInt(env, root, putMethod, "columns", info.columns);
+  putInt(env, root, putMethod, "bitsAllocated", info.bitsAllocated);
+  putInt(env, root, putMethod, "samplesPerPixel", info.samplesPerPixel);
+  putString(env, root, putMethod, "photometricInterpretation",
+            info.photometricInterpretation);
+  putInt(env, root, putMethod, "numberOfFrames", info.numberOfFrames);
+  putBool(env, root, putMethod, "hasPixelData", info.hasPixelData);
+  env->DeleteLocalRef(mapCls);
+  return root;
+}
+
+extern "C" JNIEXPORT jobject JNICALL
 Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeReadDicom(
     JNIEnv* env, jobject /* this */, jstring jPath) {
   const char* cPath = env->GetStringUTFChars(jPath, nullptr);

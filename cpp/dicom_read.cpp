@@ -425,4 +425,83 @@ void writeSyntheticDicomFile(const std::string& path,
   }
 }
 
+void extractPixelDataToFile(const std::string& dicomPath,
+                            const std::string& outPath,
+                            PixelDataInfo& out) {
+  out.filePath.clear();
+  out.byteLength = 0;
+  out.rows = 0;
+  out.columns = 0;
+  out.bitsAllocated = 0;
+  out.samplesPerPixel = 0;
+  out.photometricInterpretation.clear();
+  out.numberOfFrames = 1;
+  out.hasPixelData = false;
+
+  // First pass: parse the file like readDicomFile does, just to gate on
+  // transfer-syntax support and grab the image attributes. Cheap — the
+  // metadata pass doesn't decode pixels.
+  gdcm::Reader reader;
+  reader.SetFileName(dicomPath.c_str());
+  if (!reader.Read()) {
+    throw std::runtime_error(
+        std::string("extractPixelData: not a readable DICOM file: ")
+        + dicomPath);
+  }
+  const gdcm::File& file = reader.GetFile();
+  const gdcm::DataSet& ds = file.GetDataSet();
+  const gdcm::TransferSyntax ts =
+      file.GetHeader().GetDataSetTransferSyntax();
+
+  out.rows = readIntAttr<0x0028, 0x0010>(ds, 0);
+  out.columns = readIntAttr<0x0028, 0x0011>(ds, 0);
+  out.bitsAllocated = readIntAttr<0x0028, 0x0100>(ds, 0);
+  out.samplesPerPixel = readIntAttr<0x0028, 0x0002>(ds, 1);
+  out.photometricInterpretation = readStringAttr<0x0028, 0x0004>(ds);
+  out.numberOfFrames = readIntAttr<0x0028, 0x0008>(ds, 1);
+  if (out.numberOfFrames < 1) out.numberOfFrames = 1;
+
+  if (!ds.FindDataElement(gdcm::Tag(0x7FE0, 0x0010))) {
+    return;  // no pixel data — legitimate (SR documents, etc.)
+  }
+  if (!isSupportedSyntax(ts)) {
+    return;  // hazard H-021 — never substitute bytes for unsupported syntax
+  }
+
+  // Second pass: GDCM ImageReader does the decode + buffer assembly.
+  gdcm::ImageReader ir;
+  ir.SetFileName(dicomPath.c_str());
+  if (!ir.Read()) {
+    return;  // metadata-only DICOM; not an image
+  }
+  const gdcm::Image& img = ir.GetImage();
+  const unsigned long bufLen = img.GetBufferLength();
+  if (bufLen == 0) return;
+
+  std::vector<char> buf(bufLen);
+  if (!img.GetBuffer(buf.data())) {
+    throw std::runtime_error(
+        "extractPixelData: GDCM accepted the file but failed to extract "
+        "pixel data; file may be malformed");
+  }
+
+  // Stream bytes directly to disk — never materialised in JS heap.
+  std::FILE* fp = std::fopen(outPath.c_str(), "wb");
+  if (!fp) {
+    throw std::runtime_error(
+        std::string("extractPixelData: cannot open ") + outPath
+        + " for writing");
+  }
+  const size_t written = std::fwrite(buf.data(), 1, bufLen, fp);
+  std::fclose(fp);
+  if (written != bufLen) {
+    throw std::runtime_error(
+        std::string("extractPixelData: short write to ") + outPath);
+  }
+
+  out.filePath = outPath;
+  out.byteLength = static_cast<long long>(bufLen);
+  out.hasPixelData = true;
+}
+
 }  // namespace vnd

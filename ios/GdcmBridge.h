@@ -38,6 +38,15 @@ NS_ASSUME_NONNULL_BEGIN
 // table.
 + (BOOL)isSupportedTransferSyntax:(NSString *)transferSyntaxUID;
 
+// Phase 2.5 — extract uncompressed pixel data to `outPath` (caller-owned)
+// and return geometry + path metadata as an NSDictionary. On unsupported
+// transfer syntaxes returns a dict with hasPixelData=NO and no file is
+// written. On unrecoverable errors (unreadable DICOM, write failure)
+// returns nil and populates `error`.
++ (nullable NSDictionary *)extractPixelDataAtPath:(NSString *)dicomPath
+                                            toPath:(NSString *)outPath
+                                             error:(NSError **)error;
+
 @end
 
 NS_ASSUME_NONNULL_END

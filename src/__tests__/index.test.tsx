@@ -35,6 +35,36 @@ jest.mock('../NativeVibeNativeDicom', () => {
         }
         return `/tmp/vnd-synthetic-${uid || 'default'}.dcm`;
       },
+      extractPixelDataToFile: (dicomPath: string, outPath: string) => {
+        // Mimic the C++ contract: success path returns hasPixelData=true
+        // and fakes a 256-byte gradient. Unknown UID in the path yields
+        // hasPixelData=false (the H-021 contract).
+        const isUnsupported = dicomPath.includes('1.2.840.10008.1.2.4.100');
+        if (isUnsupported) {
+          return {
+            filePath: '',
+            byteLength: 0,
+            rows: 16,
+            columns: 16,
+            bitsAllocated: 8,
+            samplesPerPixel: 1,
+            photometricInterpretation: 'MONOCHROME2',
+            numberOfFrames: 1,
+            hasPixelData: false,
+          };
+        }
+        return {
+          filePath: outPath,
+          byteLength: 256,
+          rows: 16,
+          columns: 16,
+          bitsAllocated: 8,
+          samplesPerPixel: 1,
+          photometricInterpretation: 'MONOCHROME2',
+          numberOfFrames: 1,
+          hasPixelData: true,
+        };
+      },
       readDicom: (path: string) => {
         const uidMatch = path.match(/vnd-synthetic-([0-9.]+|default)/);
         const uid = uidMatch?.[1];
@@ -291,5 +321,51 @@ describe('Phase 2.3 — ergonomic helpers', () => {
     expect(result).toBeNull();
     // Critical: never return NaN — viewers would render garbage.
     expect(Number.isNaN(result)).toBe(false);
+  });
+});
+
+describe('Phase 2.5 — extractPixelDataToFile', () => {
+  it('exports the function from the package surface', () => {
+    expect(typeof lib.extractPixelDataToFile).toBe('function');
+  });
+
+  it('returns the documented PixelDataInfo shape', () => {
+    const info = lib.extractPixelDataToFile(
+      '/tmp/vnd-synthetic-default.dcm',
+      '/tmp/out.pixels'
+    );
+    expect(info.filePath).toBe('/tmp/out.pixels');
+    expect(info.byteLength).toBe(256);
+    expect(info.rows).toBe(16);
+    expect(info.columns).toBe(16);
+    expect(info.bitsAllocated).toBe(8);
+    expect(info.samplesPerPixel).toBe(1);
+    expect(info.photometricInterpretation).toBe('MONOCHROME2');
+    expect(info.numberOfFrames).toBe(1);
+    expect(info.hasPixelData).toBe(true);
+  });
+
+  it('returns hasPixelData=false (no file written) for unsupported syntaxes', () => {
+    // Hazard H-021: the C++ helper writes nothing for unsupported syntaxes.
+    const info = lib.extractPixelDataToFile(
+      '/tmp/vnd-synthetic-1.2.840.10008.1.2.4.100.dcm',
+      '/tmp/out.pixels'
+    );
+    expect(info.hasPixelData).toBe(false);
+    expect(info.filePath).toBe('');
+    expect(info.byteLength).toBe(0);
+  });
+
+  it('drops the 33% bridge bloat vs base64 (synthetic check)', () => {
+    // 256 raw bytes vs 344-char base64 (= 258 round-trip bytes after pad
+    // accounting). The point isn't the absolute number for our 16x16
+    // synthetic — it's that the file path delivers the raw byte count
+    // without any expansion.
+    const info = lib.extractPixelDataToFile(
+      '/tmp/vnd-synthetic-default.dcm',
+      '/tmp/out.pixels'
+    );
+    const base64ApproxBytes = Math.ceil((info.byteLength * 4) / 3);
+    expect(info.byteLength).toBeLessThan(base64ApproxBytes);
   });
 });

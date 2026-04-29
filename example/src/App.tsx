@@ -15,6 +15,9 @@ import {
   isSupportedTransferSyntax,
   TransferSyntaxUID,
   LOSSLESS_TRANSFER_SYNTAXES,
+  // Phase 2.5 — pixel-data extraction
+  extractPixelDataToFile,
+  type PixelDataInfo,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -95,6 +98,19 @@ export default function App() {
   // Phase 2.3: parsed file from the Implicit VR LE round-trip, used by the
   // helpers + SQ display below.
   const [reference, setReference] = useState<DicomFile | null>(null);
+  // Phase 2.5: head-to-head perf of base64 (readDicom path) vs file
+  // extraction (extractPixelDataToFile path). For the synthetic 16x16x8-bit
+  // image the absolute numbers are tiny — but the *ratio* is real and
+  // scales linearly to clinical CT slice sizes.
+  type PerfRow = {
+    base64Bytes: number;
+    base64Ms: number;
+    fileBytes: number;
+    fileMs: number;
+    info: PixelDataInfo;
+  };
+  const [perf, setPerf] = useState<PerfRow | null>(null);
+  const [perfErr, setPerfErr] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -174,6 +190,51 @@ export default function App() {
         readPass: false,
         message: (err as Error).message,
       });
+    }
+
+    // Phase 2.5 perf comparison. Each path runs N times and we take the
+    // best wall-clock — JS warmup absorbs the first-call cost.
+    try {
+      const N = 5;
+      const dicomPath = writeSyntheticDicom(
+        TransferSyntaxUID.ImplicitVRLittleEndian
+      );
+
+      let bestBase64Ms = Number.POSITIVE_INFINITY;
+      let base64Bytes = 0;
+      for (let i = 0; i < N; i++) {
+        const t0 = Date.now();
+        const f = readDicom(dicomPath);
+        const dt = Date.now() - t0;
+        const b64 = f.image?.pixelDataBase64 ?? '';
+        // Approximate decoded byte count from base64 length.
+        const pad = (b64.match(/[=]+$/) ?? [''])[0].length;
+        base64Bytes = (b64.length / 4) * 3 - pad;
+        if (dt < bestBase64Ms) bestBase64Ms = dt;
+      }
+
+      let bestFileMs = Number.POSITIVE_INFINITY;
+      let lastInfo: PixelDataInfo | null = null;
+      for (let i = 0; i < N; i++) {
+        const outPath = `${dicomPath}.${i}.pixels`;
+        const t0 = Date.now();
+        const info = extractPixelDataToFile(dicomPath, outPath);
+        const dt = Date.now() - t0;
+        if (dt < bestFileMs) bestFileMs = dt;
+        lastInfo = info;
+      }
+
+      if (lastInfo) {
+        setPerf({
+          base64Bytes,
+          base64Ms: bestBase64Ms,
+          fileBytes: lastInfo.byteLength,
+          fileMs: bestFileMs,
+          info: lastInfo,
+        });
+      }
+    } catch (err) {
+      setPerfErr((err as Error).message);
     }
   }, []);
 
@@ -320,6 +381,33 @@ export default function App() {
           );
         })()}
 
+      <Text style={styles.section}>Pixel-data path comparison (Phase 2.5)</Text>
+      {perf === null && perfErr === null && <ActivityIndicator />}
+      {perfErr !== null && <Text style={styles.fail}>FAIL · {perfErr}</Text>}
+      {perf !== null && (
+        <View style={styles.block}>
+          <Text style={styles.label}>via readDicom().pixelDataBase64</Text>
+          <Text style={styles.value}>
+            {perf.base64Bytes} bytes · {perf.base64Ms} ms
+          </Text>
+
+          <Text style={styles.label}>via extractPixelDataToFile()</Text>
+          <Text style={styles.value}>
+            {perf.fileBytes} bytes · {perf.fileMs} ms
+          </Text>
+          <Text style={styles.path} numberOfLines={2}>
+            {perf.info.filePath}
+          </Text>
+
+          <Text style={styles.label}>Bridge payload reduction</Text>
+          <Text style={styles.value}>
+            {perf.base64Bytes > 0
+              ? `${((1 - perf.fileBytes / ((perf.base64Bytes * 4) / 3)) * 100).toFixed(0)}% smaller bridge transfer (no base64)`
+              : 'n/a'}
+          </Text>
+        </View>
+      )}
+
       <Text style={styles.section}>Overall</Text>
       <Text style={overallPass ? styles.passLarge : styles.failLarge}>
         {overallPass ? 'PASS' : 'FAIL'}
@@ -368,6 +456,12 @@ const styles = StyleSheet.create({
     color: '#888',
     fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
     marginBottom: 2,
+  },
+  path: {
+    fontSize: 10,
+    color: '#888',
+    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
+    marginTop: 2,
   },
   block: {
     marginTop: 6,

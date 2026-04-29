@@ -43,6 +43,20 @@
   return result;
 }
 
+- (id)extractPixelDataToFile:(NSString *)dicomPath outPath:(NSString *)outPath {
+  NSError *error = nil;
+  NSDictionary *result =
+      [VibeNativeDicomImpl extractPixelDataToFile:dicomPath
+                                          outPath:outPath
+                                            error:&error];
+  if (result == nil) {
+    @throw [NSException exceptionWithName:@"VibeNativeDicomError"
+                                   reason:error.localizedDescription ?: @"extractPixelDataToFile failed"
+                                 userInfo:nil];
+  }
+  return result;
+}
+
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
     (const facebook::react::ObjCTurboModule::InitParams &)params
 {

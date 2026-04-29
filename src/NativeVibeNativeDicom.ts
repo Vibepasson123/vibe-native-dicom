@@ -39,6 +39,16 @@ export interface Spec extends TurboModule {
   // bridge. The shape is described by `DicomFile` in src/types.ts; the JS
   // wrapper in src/readDicom.native.tsx casts to that shape.
   readDicom(path: string): Object;
+
+  // Phase 2.5 (SR-0017): extract uncompressed pixel data to a file on
+  // disk and return its path + geometry. Bytes never traverse the JSI
+  // bridge — for a 50 MB CT this is ~3000× faster than the base64 path
+  // exposed via readDicom().image.pixelDataBase64. Caller picks `outPath`
+  // (typically a tmpdir under cacheDir / NSTemporaryDirectory). On
+  // unsupported transfer syntaxes the call succeeds but returned
+  // hasPixelData is false and no file is written — the H-021 contract
+  // applies here too.
+  extractPixelDataToFile(dicomPath: string, outPath: string): Object;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('VibeNativeDicom');

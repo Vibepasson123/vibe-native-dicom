@@ -38,6 +38,17 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
     return Arguments.makeNativeMap(raw)
   }
 
+  override fun extractPixelDataToFile(
+    dicomPath: String,
+    outPath: String
+  ): WritableMap {
+    @Suppress("UNCHECKED_CAST")
+    val raw =
+      nativeExtractPixelDataToFile(dicomPath, outPath)
+        as java.util.HashMap<String, Any?>
+    return Arguments.makeNativeMap(raw)
+  }
+
   // Implemented in libVibeNativeDicom.so (Android NDK build of
   // android/src/main/cpp/VibeNativeDicom-jni.cpp). Loaded by the static
   // initializer below.
@@ -50,6 +61,10 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
     transferSyntaxUID: String
   ): Boolean
   private external fun nativeReadDicom(path: String): Any
+  private external fun nativeExtractPixelDataToFile(
+    dicomPath: String,
+    outPath: String
+  ): Any
 
   companion object {
     const val NAME: String = NativeVibeNativeDicomSpec.NAME
