@@ -504,4 +504,38 @@ void extractPixelDataToFile(const std::string& dicomPath,
   out.hasPixelData = true;
 }
 
+std::string readBinaryFileAsLatin1(const std::string& path,
+                                   long long maxBytes) {
+  std::FILE* fp = std::fopen(path.c_str(), "rb");
+  if (!fp) {
+    throw std::runtime_error(
+        std::string("readBinaryFile: cannot open ") + path);
+  }
+  if (std::fseek(fp, 0, SEEK_END) != 0) {
+    std::fclose(fp);
+    throw std::runtime_error(std::string("readBinaryFile: seek failed: ") + path);
+  }
+  long size = std::ftell(fp);
+  if (size < 0) {
+    std::fclose(fp);
+    throw std::runtime_error(
+        std::string("readBinaryFile: ftell failed: ") + path);
+  }
+  if (maxBytes > 0 && static_cast<long long>(size) > maxBytes) {
+    std::fclose(fp);
+    throw std::runtime_error(
+        std::string("readBinaryFile: file exceeds maxBytes: ") + path);
+  }
+  std::rewind(fp);
+  std::string out;
+  out.resize(static_cast<size_t>(size));
+  size_t read = std::fread(&out[0], 1, static_cast<size_t>(size), fp);
+  std::fclose(fp);
+  if (read != static_cast<size_t>(size)) {
+    throw std::runtime_error(
+        std::string("readBinaryFile: short read: ") + path);
+  }
+  return out;
+}
+
 }  // namespace vnd

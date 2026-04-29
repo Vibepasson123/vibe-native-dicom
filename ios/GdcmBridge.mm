@@ -116,6 +116,29 @@ static NSDictionary *datasetToDictionary(const vnd::DicomDataset &ds) {
              : NO;
 }
 
++ (nullable NSString *)readBinaryFileAtPath:(NSString *)path
+                                    maxBytes:(double)maxBytes
+                                       error:(NSError **)error {
+  std::string bytes;
+  try {
+    bytes = vnd::readBinaryFileAsLatin1(
+        std::string([path UTF8String]), static_cast<long long>(maxBytes));
+  } catch (const std::exception &e) {
+    if (error) *error = makeError(e.what());
+    return nil;
+  }
+  // Build an NSString in which each unichar is one byte (Latin-1 encoding).
+  // The C++ string holds raw bytes; reinterpret as UTF-16 chars by widening
+  // each byte to 16 bits.
+  const size_t n = bytes.size();
+  std::vector<unichar> chars(n);
+  for (size_t i = 0; i < n; ++i) {
+    chars[i] = static_cast<unichar>(static_cast<unsigned char>(bytes[i]));
+  }
+  return [NSString stringWithCharacters:chars.data()
+                                  length:static_cast<NSUInteger>(n)];
+}
+
 + (nullable NSDictionary *)extractPixelDataAtPath:(NSString *)dicomPath
                                             toPath:(NSString *)outPath
                                              error:(NSError **)error {

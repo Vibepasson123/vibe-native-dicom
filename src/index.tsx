@@ -6,6 +6,16 @@ export {
   isSupportedTransferSyntax,
   extractPixelDataToFile,
 } from './readDicom';
+// Phase 3.1 — viewer surface
+export {
+  DicomImageView,
+  type DicomImageViewProps,
+  applyWindowLevel,
+  type WindowLevelInput,
+  bytesFromLatin1,
+  encodeRgbaPng,
+  pngBytesToDataUri,
+} from './viewer';
 export type {
   DicomElement,
   DicomDataset,

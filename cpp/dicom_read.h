@@ -163,4 +163,13 @@ void extractPixelDataToFile(const std::string& dicomPath,
                             const std::string& outPath,
                             PixelDataInfo& out);
 
+// Reads a binary file at `path` and returns its contents as a Latin-1
+// byte-string (one char per byte, no encoding). The Phase 3.1 JS viewer
+// uses this to ingest pixel buffers written by extractPixelDataToFile()
+// without adding react-native-fs as a peer dep. Throws std::runtime_error
+// on failure (file not present, read error). Bytes are bounded by
+// `maxBytes` — pass 0 for unlimited (caller's risk for OOM).
+std::string readBinaryFileAsLatin1(const std::string& path,
+                                   long long maxBytes);
+
 }  // namespace vnd

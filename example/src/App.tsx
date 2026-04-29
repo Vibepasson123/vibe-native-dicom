@@ -18,6 +18,8 @@ import {
   // Phase 2.5 — pixel-data extraction
   extractPixelDataToFile,
   type PixelDataInfo,
+  // Phase 3.1 — viewer
+  DicomImageView,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -111,6 +113,14 @@ export default function App() {
   };
   const [perf, setPerf] = useState<PerfRow | null>(null);
   const [perfErr, setPerfErr] = useState<string | null>(null);
+  // Phase 3.1 viewer state — live W/L sliders.
+  const [wc, setWc] = useState<number>(128);
+  const [ww, setWw] = useState<number>(256);
+  const [lastRender, setLastRender] = useState<{
+    renderMs: number;
+    pngBytes: number;
+  } | null>(null);
+  const [viewerErr, setViewerErr] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -408,6 +418,67 @@ export default function App() {
         </View>
       )}
 
+      <Text style={styles.section}>Live W/L viewer (Phase 3.1)</Text>
+      {perf?.info.hasPixelData ? (
+        <View style={styles.block}>
+          <Text style={styles.label}>Window center</Text>
+          <View style={styles.sliderRow}>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => setWc(Math.max(0, wc - 16))}
+            >
+              −
+            </Text>
+            <Text style={styles.sliderValue}>{wc}</Text>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => setWc(Math.min(255, wc + 16))}
+            >
+              +
+            </Text>
+          </View>
+          <Text style={styles.label}>Window width</Text>
+          <View style={styles.sliderRow}>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => setWw(Math.max(1, ww - 16))}
+            >
+              −
+            </Text>
+            <Text style={styles.sliderValue}>{ww}</Text>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => setWw(Math.min(512, ww + 16))}
+            >
+              +
+            </Text>
+          </View>
+          <View style={styles.viewerWrapper}>
+            <DicomImageView
+              filePath={perf.info.filePath}
+              rows={perf.info.rows}
+              columns={perf.info.columns}
+              bitsAllocated={perf.info.bitsAllocated}
+              photometricInterpretation={perf.info.photometricInterpretation}
+              windowCenter={wc}
+              windowWidth={ww}
+              style={styles.viewer}
+              onRendered={(info) => setLastRender(info)}
+              onError={(err) => setViewerErr(err.message)}
+            />
+          </View>
+          {lastRender && (
+            <Text style={styles.label}>
+              rendered in {lastRender.renderMs} ms · PNG {lastRender.pngBytes}{' '}
+              bytes
+            </Text>
+          )}
+          {viewerErr && <Text style={styles.fail}>FAIL · {viewerErr}</Text>}
+        </View>
+      ) : (
+        <Text style={styles.label}>Waiting for pixel data…</Text>
+      )}
+
       <Text style={styles.section}>Overall</Text>
       <Text style={overallPass ? styles.passLarge : styles.failLarge}>
         {overallPass ? 'PASS' : 'FAIL'}
@@ -465,6 +536,38 @@ const styles = StyleSheet.create({
   },
   block: {
     marginTop: 6,
+  },
+  sliderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginTop: 4,
+  },
+  sliderButton: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0a66c2',
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    backgroundColor: '#eef',
+    borderRadius: 6,
+  },
+  sliderValue: {
+    fontSize: 18,
+    fontVariant: ['tabular-nums'],
+    minWidth: 60,
+    textAlign: 'center',
+  },
+  viewerWrapper: {
+    marginTop: 12,
+    alignItems: 'center',
+    backgroundColor: '#000',
+    padding: 8,
+    borderRadius: 6,
+  },
+  viewer: {
+    width: 256,
+    height: 256,
   },
   pass: {
     fontSize: 14,

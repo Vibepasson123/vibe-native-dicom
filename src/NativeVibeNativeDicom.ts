@@ -49,6 +49,13 @@ export interface Spec extends TurboModule {
   // hasPixelData is false and no file is written — the H-021 contract
   // applies here too.
   extractPixelDataToFile(dicomPath: string, outPath: string): Object;
+
+  // Phase 3.1: read a binary file at `path` and return its bytes as a
+  // Latin-1-encoded string (one JS char per byte). The viewer uses this
+  // to slurp pixel buffers without depending on react-native-fs. Pass
+  // maxBytes=0 for unlimited; values >0 cap memory usage and throw if
+  // the file is larger.
+  readBinaryFile(path: string, maxBytes: number): string;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('VibeNativeDicom');

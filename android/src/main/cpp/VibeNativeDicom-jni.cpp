@@ -174,6 +174,49 @@ Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeIsSupportedTransfe
   return vnd::isSupportedTransferSyntax(tsUID) ? JNI_TRUE : JNI_FALSE;
 }
 
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeReadBinaryFile(
+    JNIEnv* env, jobject /* this */, jstring jPath, jdouble jMaxBytes) {
+  if (jPath == nullptr) {
+    throwJavaRuntime(env, "readBinaryFile: null path");
+    return nullptr;
+  }
+  const char* cPath = env->GetStringUTFChars(jPath, nullptr);
+  if (cPath == nullptr) {
+    throwJavaRuntime(env, "readBinaryFile: bad path encoding");
+    return nullptr;
+  }
+  std::string path(cPath);
+  env->ReleaseStringUTFChars(jPath, cPath);
+
+  std::string bytes;
+  try {
+    bytes = vnd::readBinaryFileAsLatin1(
+        path, static_cast<long long>(jMaxBytes));
+  } catch (const std::exception& e) {
+    throwJavaRuntime(env, e.what());
+    return nullptr;
+  }
+
+  // Pass bytes to JVM as a Latin-1 String. We CAN'T use NewStringUTF
+  // because high bytes would be interpreted as multibyte UTF-8 sequences.
+  // Instead build a byte[] then construct String(bytes, "ISO-8859-1").
+  jbyteArray byteArr = env->NewByteArray(static_cast<jsize>(bytes.size()));
+  env->SetByteArrayRegion(
+      byteArr, 0, static_cast<jsize>(bytes.size()),
+      reinterpret_cast<const jbyte*>(bytes.data()));
+  jclass strCls = env->FindClass("java/lang/String");
+  jmethodID strCtor =
+      env->GetMethodID(strCls, "<init>", "([BLjava/lang/String;)V");
+  jstring charset = env->NewStringUTF("ISO-8859-1");
+  jstring result = static_cast<jstring>(
+      env->NewObject(strCls, strCtor, byteArr, charset));
+  env->DeleteLocalRef(byteArr);
+  env->DeleteLocalRef(charset);
+  env->DeleteLocalRef(strCls);
+  return result;
+}
+
 extern "C" JNIEXPORT jobject JNICALL
 Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeExtractPixelDataToFile(
     JNIEnv* env, jobject /* this */, jstring jDicomPath, jstring jOutPath) {

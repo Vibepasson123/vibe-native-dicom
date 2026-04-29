@@ -47,6 +47,13 @@ NS_ASSUME_NONNULL_BEGIN
                                             toPath:(NSString *)outPath
                                              error:(NSError **)error;
 
+// Phase 3.1 — read a binary file as a Latin-1-encoded NSString
+// (one unichar per byte, code points 0-255). Throws via `error` on read
+// failure. `maxBytes` is the max allowed file size in bytes (0 = unlimited).
++ (nullable NSString *)readBinaryFileAtPath:(NSString *)path
+                                    maxBytes:(double)maxBytes
+                                       error:(NSError **)error;
+
 @end
 
 NS_ASSUME_NONNULL_END

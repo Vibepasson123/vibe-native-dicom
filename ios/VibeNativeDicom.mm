@@ -57,6 +57,19 @@
   return result;
 }
 
+- (NSString *)readBinaryFile:(NSString *)path maxBytes:(double)maxBytes {
+  NSError *error = nil;
+  NSString *result = [VibeNativeDicomImpl readBinaryFile:path
+                                                maxBytes:@(maxBytes)
+                                                   error:&error];
+  if (result == nil) {
+    @throw [NSException exceptionWithName:@"VibeNativeDicomError"
+                                   reason:error.localizedDescription ?: @"readBinaryFile failed"
+                                 userInfo:nil];
+  }
+  return result;
+}
+
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
     (const facebook::react::ObjCTurboModule::InitParams &)params
 {

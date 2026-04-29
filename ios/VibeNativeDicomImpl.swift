@@ -54,4 +54,15 @@ import Foundation
     )
     return dict as NSDictionary
   }
+
+  @objc public static func readBinaryFile(
+    _ path: NSString,
+    maxBytes: NSNumber
+  ) throws -> NSString {
+    let s = try GdcmBridge.readBinaryFile(
+      atPath: path as String,
+      maxBytes: maxBytes.doubleValue
+    )
+    return s as NSString
+  }
 }

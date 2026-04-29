@@ -49,6 +49,10 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
     return Arguments.makeNativeMap(raw)
   }
 
+  override fun readBinaryFile(path: String, maxBytes: Double): String {
+    return nativeReadBinaryFile(path, maxBytes)
+  }
+
   // Implemented in libVibeNativeDicom.so (Android NDK build of
   // android/src/main/cpp/VibeNativeDicom-jni.cpp). Loaded by the static
   // initializer below.
@@ -65,6 +69,10 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
     dicomPath: String,
     outPath: String
   ): Any
+  private external fun nativeReadBinaryFile(
+    path: String,
+    maxBytes: Double
+  ): String
 
   companion object {
     const val NAME: String = NativeVibeNativeDicomSpec.NAME
