@@ -86,6 +86,7 @@
     "react": "19.2.3",
     "react-native": "0.85.0",
     "react-native-builder-bob": "^0.41.0",
+    "react-native-gesture-handler": "^2.31.1",
     "release-it": "^19.2.4",
     "turbo": "^2.8.21",
     "typescript": "^6.0.2"
@@ -93,10 +94,14 @@
   "peerDependencies": {
     "@shopify/react-native-skia": ">=2.0.0",
     "react": "*",
-    "react-native": "*"
+    "react-native": "*",
+    "react-native-gesture-handler": ">=2.20.0"
   },
   "peerDependenciesMeta": {
     "@shopify/react-native-skia": {
+      "optional": true
+    },
+    "react-native-gesture-handler": {
       "optional": true
     }
   },

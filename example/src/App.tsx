@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
   multiply,
   getGdcmVersion,
@@ -22,6 +23,8 @@ import {
   DicomImageView,
   // Phase 3.2 — Skia/GPU viewer
   DicomImageViewSkia,
+  // Phase 3.3 — gestures
+  type ViewerTransform,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -86,7 +89,7 @@ function compareWithExpected(parsed: DicomFile): boolean {
   return decodeBase64ByteCount(b64) === 256;
 }
 
-export default function App() {
+function App() {
   const product = multiply(3, 7);
 
   const [version, setVersion] = useState<string | null>(null);
@@ -128,6 +131,13 @@ export default function App() {
     null
   );
   const [skiaErr, setSkiaErr] = useState<string | null>(null);
+  // Phase 3.3 — current viewer transform from pan/pinch/rotate gestures.
+  const [transform, setTransform] = useState<ViewerTransform>({
+    scale: 1,
+    translateX: 0,
+    translateY: 0,
+    rotation: 0,
+  });
 
   useEffect(() => {
     try {
@@ -503,8 +513,10 @@ export default function App() {
               windowWidth={ww}
               width={256}
               height={256}
+              enableGestures
               onReady={(info) => setSkiaUpload(info)}
               onError={(err) => setSkiaErr(err.message)}
+              onTransformChange={(t) => setTransform(t)}
             />
           </View>
           {skiaUpload && (
@@ -514,6 +526,25 @@ export default function App() {
             </Text>
           )}
           {skiaErr && <Text style={styles.fail}>FAIL · {skiaErr}</Text>}
+          <Text style={styles.label}>Transform (pinch / pan / rotate)</Text>
+          <Text style={styles.value}>
+            scale {transform.scale.toFixed(2)} · t (
+            {transform.translateX.toFixed(0)}, {transform.translateY.toFixed(0)}
+            ) · {((transform.rotation * 180) / Math.PI).toFixed(0)}°
+          </Text>
+          <Text
+            style={styles.sliderButton}
+            onPress={() =>
+              setTransform({
+                scale: 1,
+                translateX: 0,
+                translateY: 0,
+                rotation: 0,
+              })
+            }
+          >
+            Reset transform
+          </Text>
         </View>
       ) : (
         <Text style={styles.label}>Waiting for pixel data…</Text>
@@ -527,7 +558,21 @@ export default function App() {
   );
 }
 
+// react-native-gesture-handler requires a GestureHandlerRootView at the
+// top of the React tree to wire native gestures into the JS bridge. We
+// wrap the example app to keep the Phase 3.3 viewer interactive.
+export default function AppRoot() {
+  return (
+    <GestureHandlerRootView style={styles.root}>
+      <App />
+    </GestureHandlerRootView>
+  );
+}
+
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   scroll: {
     padding: 24,
     paddingTop: 64,

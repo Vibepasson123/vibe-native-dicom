@@ -7,6 +7,14 @@ export {
   DicomImageViewSkia,
   type DicomImageViewSkiaProps,
 } from './DicomImageViewSkia';
+// Phase 3.3 — gesture composer. Pure TS hook on top of
+// react-native-gesture-handler (optional peer dep). Reusable for
+// consumers building their own viewer.
+export {
+  useViewerGestures,
+  type ViewerTransform,
+  type UseViewerGesturesResult,
+} from './useViewerGestures';
 export {
   applyWindowLevel,
   bytesFromLatin1,

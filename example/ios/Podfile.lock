@@ -1771,6 +1771,28 @@ PODS:
     - React-utils (= 0.85.0)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.85.0)
+  - RNGestureHandler (2.31.1):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - VibeNativeDicom (0.1.0):
     - hermes-engine
     - RCTRequired
@@ -1870,6 +1892,7 @@ DEPENDENCIES:
   - ReactCodegen (from `build/generated/ios/ReactCodegen`)
   - ReactCommon/turbomodule/core (from `../../node_modules/react-native/ReactCommon`)
   - ReactNativeDependencies (from `../../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec`)
+  - RNGestureHandler (from `../../node_modules/react-native-gesture-handler`)
   - VibeNativeDicom (from `../..`)
   - Yoga (from `../../node_modules/react-native/ReactCommon/yoga`)
 
@@ -2021,6 +2044,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/react-native/ReactCommon"
   ReactNativeDependencies:
     :podspec: "../../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec"
+  RNGestureHandler:
+    :path: "../../node_modules/react-native-gesture-handler"
   VibeNativeDicom:
     :path: "../.."
   Yoga:
@@ -2100,6 +2125,7 @@ SPEC CHECKSUMS:
   ReactCodegen: 2f0ae2f4bdb77897a207e3f8f26f767d94b2eecd
   ReactCommon: fe2a3af8975e63efa60f95fca8c34dc85deee360
   ReactNativeDependencies: 4f0d89ba4957a08910cb55f1888a671f1a569320
+  RNGestureHandler: 187c5c7936abf427bc4d22d6c3b1ac80ad1f63c0
   VibeNativeDicom: 88238a9aee237e15673bcc1779997ead5799f21e
   Yoga: e83c3121d079541e69f3c5c623faaaf933fb5812
 

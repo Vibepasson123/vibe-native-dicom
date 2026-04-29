@@ -9,6 +9,7 @@ jest.mock('@shopify/react-native-skia', () => ({
   ColorType: { RGBA_8888: 4 },
   Canvas: () => null,
   Fill: () => null,
+  Group: () => null,
   Image: () => null,
   Shader: () => null,
   ImageShader: () => null,
@@ -18,6 +19,30 @@ jest.mock('@shopify/react-native-skia', () => ({
     Image: { MakeImage: () => null },
   },
 }));
+
+// react-native-gesture-handler also ships ESM; same mock strategy.
+jest.mock('react-native-gesture-handler', () => {
+  const chain = (): unknown => {
+    const obj = {
+      onStart: () => obj,
+      onUpdate: () => obj,
+      onBegin: () => obj,
+      onEnd: () => obj,
+    };
+    return obj;
+  };
+  return {
+    __esModule: true,
+    GestureDetector: ({ children }: { children: unknown }) => children,
+    GestureHandlerRootView: ({ children }: { children: unknown }) => children,
+    Gesture: {
+      Pan: chain,
+      Pinch: chain,
+      Rotation: chain,
+      Simultaneous: chain,
+    },
+  };
+});
 
 // Stub the TurboModule before importing the library, so the native-resolved
 // implementations (multiply.native.tsx / getGdcmVersion.native.tsx /

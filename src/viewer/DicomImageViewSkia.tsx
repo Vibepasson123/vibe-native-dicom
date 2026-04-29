@@ -19,13 +19,16 @@ import {
   Canvas,
   ColorType,
   Fill,
+  Group,
   Image as SkImage,
   Skia,
   Shader,
   ImageShader,
   type SkImage as SkImageType,
 } from '@shopify/react-native-skia';
+import { GestureDetector } from 'react-native-gesture-handler';
 import { readBinaryFile } from './platform';
+import { useViewerGestures, type ViewerTransform } from './useViewerGestures';
 
 export type DicomImageViewSkiaProps = {
   /** Path written by extractPixelDataToFile.filePath. */
@@ -50,6 +53,15 @@ export type DicomImageViewSkiaProps = {
   style?: StyleProp<ViewStyle>;
   onReady?: (info: { uploadMs: number }) => void;
   onError?: (err: Error) => void;
+  /**
+   * Phase 3.3: enable pinch / pan / rotate gestures. When `true` (default),
+   * the component wraps the Skia canvas in a <GestureDetector>. Set to
+   * `false` to disable interaction (for thumbnails, multi-frame cine, etc.).
+   * Requires react-native-gesture-handler >= 2.20.
+   */
+  enableGestures?: boolean;
+  /** Called after each gesture update with the current transform. */
+  onTransformChange?: (transform: ViewerTransform) => void;
 };
 
 /**
@@ -174,9 +186,19 @@ export function DicomImageViewSkia(props: DicomImageViewSkiaProps) {
     style,
     onReady,
     onError,
+    enableGestures = true,
+    onTransformChange,
   } = props;
 
   const [skImage, setSkImage] = useState<SkImageType | null>(null);
+  const { transform, composedGesture } = useViewerGestures();
+
+  // Notify the consumer whenever gestures change the transform. Effect
+  // (rather than calling within render) avoids "setState during render"
+  // warnings when consumers update their own state in onTransformChange.
+  useEffect(() => {
+    onTransformChange?.(transform);
+  }, [transform, onTransformChange]);
 
   // Compile the W/L shader once. It's reused for every frame.
   const wlEffect = useMemo(
@@ -235,9 +257,24 @@ export function DicomImageViewSkia(props: DicomImageViewSkiaProps) {
     imgH: rows,
   };
 
-  return (
-    <View style={[{ width, height }, style]}>
-      <Canvas style={{ width, height }}>
+  // Build the Skia transform array. We translate to the canvas center,
+  // apply rotation + scale around that point, then translate back —
+  // standard pivot-around-center pattern. User translation is applied
+  // last (in screen space).
+  const cx = width / 2;
+  const cy = height / 2;
+  const skiaTransform = [
+    { translateX: transform.translateX + cx },
+    { translateY: transform.translateY + cy },
+    { rotate: transform.rotation },
+    { scale: transform.scale },
+    { translateX: -cx },
+    { translateY: -cy },
+  ];
+
+  const canvas = (
+    <Canvas style={{ width, height }}>
+      <Group transform={skiaTransform}>
         <Fill>
           <Shader source={wlEffect} uniforms={uniforms}>
             <ImageShader
@@ -247,7 +284,17 @@ export function DicomImageViewSkia(props: DicomImageViewSkiaProps) {
             />
           </Shader>
         </Fill>
-      </Canvas>
+      </Group>
+    </Canvas>
+  );
+
+  return (
+    <View style={[{ width, height }, style]}>
+      {enableGestures ? (
+        <GestureDetector gesture={composedGesture}>{canvas}</GestureDetector>
+      ) : (
+        canvas
+      )}
       {/* The off-screen <Image/> is never rendered — kept here so type
           imports of SkImage stay tree-shakable until used. */}
       {false && <SkImage image={skImage} x={0} y={0} width={0} height={0} />}
