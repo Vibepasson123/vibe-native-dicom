@@ -71,13 +71,14 @@ jest.mock('../NativeVibeNativeDicom', () => {
       multiply: (a: number, b: number) => a * b,
       getGdcmVersion: () => '3.2.5',
       isSupportedTransferSyntax: (uid: string) => SUPPORTED_UIDS.has(uid),
-      writeSyntheticDicom: (uid: string) => {
+      writeSyntheticDicom: (uid: string, numberOfFrames = 1) => {
         if (uid && !SUPPORTED_UIDS.has(uid)) {
           throw new Error(
             `writeSyntheticDicom: unsupported transfer syntax UID: ${uid}`
           );
         }
-        return `/tmp/vnd-synthetic-${uid || 'default'}.dcm`;
+        const frames = Math.max(1, Math.floor(numberOfFrames));
+        return `/tmp/vnd-synthetic-${uid || 'default'}-${frames}f.dcm`;
       },
       extractPixelDataToFile: (dicomPath: string, outPath: string) => {
         // Mimic the C++ contract: success path returns hasPixelData=true

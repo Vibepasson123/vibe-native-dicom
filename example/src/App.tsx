@@ -25,6 +25,8 @@ import {
   DicomImageViewSkia,
   // Phase 3.3 — gestures
   type ViewerTransform,
+  // Phase 3.4 — cine playback
+  useFrameSequence,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -138,6 +140,9 @@ function App() {
     translateY: 0,
     rotation: 0,
   });
+  // Phase 3.4 — path of the multi-frame synthetic file used by the cine panel.
+  const [cinePath, setCinePath] = useState<string | null>(null);
+  const [cineErr, setCineErr] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -263,7 +268,21 @@ function App() {
     } catch (err) {
       setPerfErr((err as Error).message);
     }
+
+    // Phase 3.4: write a 12-frame synthetic DICOM for the cine panel.
+    try {
+      const path = writeSyntheticDicom(
+        TransferSyntaxUID.ImplicitVRLittleEndian,
+        12
+      );
+      setCinePath(path);
+    } catch (err) {
+      setCineErr((err as Error).message);
+    }
   }, []);
+
+  const cineFrames = 12;
+  const cine = useFrameSequence({ numberOfFrames: cineFrames, fps: 8 });
 
   const overallPass =
     parityPass === true &&
@@ -548,6 +567,47 @@ function App() {
         </View>
       ) : (
         <Text style={styles.label}>Waiting for pixel data…</Text>
+      )}
+
+      <Text style={styles.section}>Cine playback (Phase 3.4)</Text>
+      {cineErr && <Text style={styles.fail}>FAIL · {cineErr}</Text>}
+      {cinePath === null && cineErr === null && <ActivityIndicator />}
+      {cinePath !== null && (
+        <View style={styles.block}>
+          <Text style={styles.label}>
+            12-frame synthetic DICOM · gradient shifts 8 px per frame
+          </Text>
+          <View style={styles.viewerWrapper}>
+            <DicomImageViewSkia
+              filePath={cinePath}
+              rows={16}
+              columns={16}
+              bitsAllocated={8}
+              numberOfFrames={cineFrames}
+              frameIndex={cine.frame}
+              windowCenter={128}
+              windowWidth={256}
+              width={256}
+              height={256}
+              enableGestures={false}
+            />
+          </View>
+          <Text style={styles.value}>
+            frame {cine.frame + 1} / {cineFrames} ·{' '}
+            {cine.isPlaying ? 'playing' : 'paused'}
+          </Text>
+          <View style={styles.sliderRow}>
+            <Text style={styles.sliderButton} onPress={cine.prev}>
+              ‹
+            </Text>
+            <Text style={styles.sliderButton} onPress={cine.togglePlay}>
+              {cine.isPlaying ? '❚❚' : '▶'}
+            </Text>
+            <Text style={styles.sliderButton} onPress={cine.next}>
+              ›
+            </Text>
+          </View>
+        </View>
       )}
 
       <Text style={styles.section}>Overall</Text>

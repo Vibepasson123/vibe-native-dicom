@@ -16,10 +16,12 @@
   return [VibeNativeDicomImpl getGdcmVersion];
 }
 
-- (NSString *)writeSyntheticDicom:(NSString *)transferSyntaxUID {
+- (NSString *)writeSyntheticDicom:(NSString *)transferSyntaxUID
+                   numberOfFrames:(double)numberOfFrames {
   NSError *error = nil;
   NSString *path = [VibeNativeDicomImpl writeSyntheticDicom:transferSyntaxUID
-                                                      error:&error];
+                                              numberOfFrames:@(numberOfFrames)
+                                                       error:&error];
   if (path == nil) {
     @throw [NSException exceptionWithName:@"VibeNativeDicomError"
                                    reason:error.localizedDescription ?: @"writeSyntheticDicom failed"

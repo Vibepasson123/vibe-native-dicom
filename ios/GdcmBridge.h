@@ -27,10 +27,13 @@ NS_ASSUME_NONNULL_BEGIN
 
 // Writes a minimal valid synthetic DICOM (16x16 monochrome MR) to `path`
 // in the given transfer syntax. Empty string defaults to Implicit VR LE
-// (Phase 2.1 behaviour). Returns YES on success; on failure (unsupported
-// syntax, encode failure, write failure) returns NO and populates `error`.
+// (Phase 2.1 behaviour). `numberOfFrames` >= 1 (Phase 3.4); values > 1
+// are only valid for the uncompressed transfer syntaxes. Returns YES on
+// success; on failure (unsupported syntax, encode failure, write failure)
+// returns NO and populates `error`.
 + (BOOL)writeSyntheticDicomAtPath:(NSString *)path
                 transferSyntaxUID:(NSString *)transferSyntaxUID
+                   numberOfFrames:(NSInteger)numberOfFrames
                             error:(NSError **)error;
 
 // Returns YES when the package can decode pixel data for the given

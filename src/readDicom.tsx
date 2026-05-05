@@ -6,7 +6,10 @@ export function readDicom(_path: string): DicomFile {
   );
 }
 
-export function writeSyntheticDicom(_transferSyntaxUID: string = ''): string {
+export function writeSyntheticDicom(
+  _transferSyntaxUID: string = '',
+  _numberOfFrames: number = 1
+): string {
   throw new Error(
     "'@viveksah/vibe-native-dicom' is only supported on native platforms."
   );

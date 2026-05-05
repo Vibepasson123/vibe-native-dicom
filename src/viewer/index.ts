@@ -15,6 +15,12 @@ export {
   type ViewerTransform,
   type UseViewerGesturesResult,
 } from './useViewerGestures';
+// Phase 3.4 — multi-frame cine controller. Pure TS, no peer deps.
+export {
+  useFrameSequence,
+  type FrameSequenceOptions,
+  type FrameSequenceState,
+} from './useFrameSequence';
 export {
   applyWindowLevel,
   bytesFromLatin1,

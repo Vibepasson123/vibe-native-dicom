@@ -19,7 +19,10 @@ export interface Spec extends TurboModule {
   // Implicit VR Little Endian (Phase 2.1 behaviour). Any value that fails
   // `isSupportedTransferSyntax()` raises a JS exception. See
   // src/transferSyntax.ts for the canonical UID constants.
-  writeSyntheticDicom(transferSyntaxUID: string): string;
+  writeSyntheticDicom(
+    transferSyntaxUID: string,
+    numberOfFrames: number
+  ): string;
 
   // Phase 2.2 (SR-0013): returns true when the package can decode pixel
   // data for the given transfer-syntax UID. Used by callers to filter

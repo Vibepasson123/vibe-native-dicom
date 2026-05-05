@@ -97,11 +97,13 @@ static NSDictionary *datasetToDictionary(const vnd::DicomDataset &ds) {
 
 + (BOOL)writeSyntheticDicomAtPath:(NSString *)path
                 transferSyntaxUID:(NSString *)transferSyntaxUID
+                   numberOfFrames:(NSInteger)numberOfFrames
                             error:(NSError **)error {
   try {
     vnd::writeSyntheticDicomFile(
         std::string([path UTF8String]),
-        std::string([transferSyntaxUID UTF8String]));
+        std::string([transferSyntaxUID UTF8String]),
+        static_cast<int>(numberOfFrames));
     return YES;
   } catch (const std::exception &e) {
     if (error) *error = makeError(e.what());

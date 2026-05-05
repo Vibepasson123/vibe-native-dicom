@@ -15,17 +15,26 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
     return nativeGetGdcmVersion()
   }
 
-  override fun writeSyntheticDicom(transferSyntaxUID: String): String {
+  override fun writeSyntheticDicom(
+    transferSyntaxUID: String,
+    numberOfFrames: Double
+  ): String {
     // The example app cleans this up; we don't auto-delete in case the
     // caller wants to inspect the file. Filename includes the transfer
-    // syntax UID so per-syntax round trips don't overwrite each other.
+    // syntax UID + frame count so per-syntax round trips don't overwrite
+    // each other.
     val dir = reactApplicationContext.cacheDir
     val tag = if (transferSyntaxUID.isEmpty()) "default" else transferSyntaxUID
+    val frames = numberOfFrames.toInt().coerceAtLeast(1)
     val file = java.io.File(
       dir,
-      "vnd-synthetic-${tag}-${System.currentTimeMillis()}.dcm"
+      "vnd-synthetic-${tag}-${frames}f-${System.currentTimeMillis()}.dcm"
     )
-    return nativeWriteSyntheticDicom(file.absolutePath, transferSyntaxUID)
+    return nativeWriteSyntheticDicom(
+      file.absolutePath,
+      transferSyntaxUID,
+      frames
+    )
   }
 
   override fun isSupportedTransferSyntax(transferSyntaxUID: String): Boolean {
@@ -59,7 +68,8 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
   private external fun nativeGetGdcmVersion(): String
   private external fun nativeWriteSyntheticDicom(
     path: String,
-    transferSyntaxUID: String
+    transferSyntaxUID: String,
+    numberOfFrames: Int
   ): String
   private external fun nativeIsSupportedTransferSyntax(
     transferSyntaxUID: String

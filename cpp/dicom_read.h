@@ -123,8 +123,16 @@ bool isSupportedTransferSyntax(const std::string& transferSyntaxUID);
 // The pixel data is a deterministic 256-byte gradient (idx % 256) so
 // consumers can verify byte-for-byte round-trip integrity for lossless
 // syntaxes.
+//
+// Phase 3.4: when `numberOfFrames` > 1, the synthetic file contains that
+// many concatenated 16x16 frames. Each frame `f` uses pixels `(idx + f*8)
+// % 256` so cine playback shows visible motion. Multi-frame files are
+// only supported for the uncompressed transfer syntaxes (Implicit/
+// Explicit VR LE) — GDCM's encapsulated-pixel encoders work per-frame
+// but adding the encoded fragments table is more than this phase needs.
 void writeSyntheticDicomFile(const std::string& path,
-                             const std::string& transferSyntaxUID = "");
+                             const std::string& transferSyntaxUID = "",
+                             int numberOfFrames = 1);
 
 // Result of extractPixelDataToFile — what the JS layer actually needs to
 // know about the raw pixel buffer (everything except the bytes themselves,

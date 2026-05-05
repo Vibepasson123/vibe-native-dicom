@@ -274,7 +274,8 @@ bool isSupportedTransferSyntax(const std::string& transferSyntaxUID) {
 }
 
 void writeSyntheticDicomFile(const std::string& path,
-                             const std::string& transferSyntaxUID) {
+                             const std::string& transferSyntaxUID,
+                             int numberOfFrames) {
   // Resolve target transfer syntax. Empty string keeps the historical
   // Phase 2.1 default (Implicit VR LE).
   gdcm::TransferSyntax::TSType targetType =
@@ -287,22 +288,50 @@ void writeSyntheticDicomFile(const std::string& path,
     }
   }
 
+  if (numberOfFrames < 1) numberOfFrames = 1;
+
+  // Phase 3.4: multi-frame is uncompressed-only. Adding the encapsulated
+  // pixel-data fragments table for compressed multi-frame is more than
+  // this phase needs; consumers can slice their own DICOMs.
+  if (numberOfFrames > 1 &&
+      targetType != gdcm::TransferSyntax::ImplicitVRLittleEndian &&
+      targetType != gdcm::TransferSyntax::ExplicitVRLittleEndian) {
+    throw std::runtime_error(
+        "writeSyntheticDicom: numberOfFrames > 1 is only supported for "
+        "Implicit/Explicit VR Little Endian transfer syntaxes");
+  }
+
   // 16×16 monochrome 8-bit MR image. Pixels are a deterministic gradient
   // (idx % 256) so consumers can verify byte-for-byte round-trip integrity
   // for lossless syntaxes. For lossy syntaxes the image is coarse enough
-  // (256 px) that JPEG Baseline still has plenty to work with.
+  // (256 px) that JPEG Baseline still has plenty to work with. For multi-
+  // frame each frame f shifts the gradient by f*8 bytes so cine playback
+  // shows visible motion.
   const int kRows = 16;
   const int kCols = 16;
-  const int kBytes = kRows * kCols;
-  std::vector<unsigned char> pixels(kBytes);
-  for (int i = 0; i < kBytes; ++i) {
-    pixels[i] = static_cast<unsigned char>(i & 0xFF);
+  const int kPerFrame = kRows * kCols;
+  const int kBytes = kPerFrame * numberOfFrames;
+  std::vector<unsigned char> pixels(static_cast<size_t>(kBytes));
+  for (int f = 0; f < numberOfFrames; ++f) {
+    const int offset = (f * 8);  // 8-pixel per-frame shift
+    for (int i = 0; i < kPerFrame; ++i) {
+      pixels[f * kPerFrame + i] =
+          static_cast<unsigned char>((i + offset) & 0xFF);
+    }
   }
 
   gdcm::Image img;
-  img.SetNumberOfDimensions(2);
-  img.SetDimension(0, kCols);
-  img.SetDimension(1, kRows);
+  if (numberOfFrames > 1) {
+    // 3D image: dim 2 carries the frame count.
+    img.SetNumberOfDimensions(3);
+    img.SetDimension(0, kCols);
+    img.SetDimension(1, kRows);
+    img.SetDimension(2, numberOfFrames);
+  } else {
+    img.SetNumberOfDimensions(2);
+    img.SetDimension(0, kCols);
+    img.SetDimension(1, kRows);
+  }
   img.SetPhotometricInterpretation(
       gdcm::PhotometricInterpretation::MONOCHROME2);
   img.GetPixelFormat().SetSamplesPerPixel(1);
@@ -379,6 +408,13 @@ void writeSyntheticDicomFile(const std::string& path,
   setText(0x0020, 0x0010, gdcm::VR::SH, "1");
   setText(0x0020, 0x0011, gdcm::VR::IS, "1");
   setText(0x0020, 0x0013, gdcm::VR::IS, "1");
+  // Phase 3.4: NumberOfFrames is required when > 1 (Type 1 for the
+  // Multi-frame functional groups; Type 1C otherwise but always safe).
+  if (numberOfFrames > 1) {
+    char nfBuf[16];
+    std::snprintf(nfBuf, sizeof(nfBuf), "%d", numberOfFrames);
+    setText(0x0028, 0x0008, gdcm::VR::IS, nfBuf);
+  }
   // Viewer-relevant attributes — the Phase 2.3 ergonomic helpers
   // (getPixelSpacing, getWindowCenter, getRescaleSlope, …) read these.
   // Values picked so the round-trip test can assert exact byte equality

@@ -8,8 +8,11 @@ export function readDicom(path: string): DicomFile {
   return VibeNativeDicom.readDicom(path) as DicomFile;
 }
 
-export function writeSyntheticDicom(transferSyntaxUID: string = ''): string {
-  return VibeNativeDicom.writeSyntheticDicom(transferSyntaxUID);
+export function writeSyntheticDicom(
+  transferSyntaxUID: string = '',
+  numberOfFrames: number = 1
+): string {
+  return VibeNativeDicom.writeSyntheticDicom(transferSyntaxUID, numberOfFrames);
 }
 
 export function isSupportedTransferSyntax(transferSyntaxUID: string): boolean {

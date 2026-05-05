@@ -12,7 +12,7 @@
 // JS-only viewer (DicomImageView, Phase 3.1) keeps working when Skia
 // isn't installed.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 import {
   AlphaType,
@@ -62,6 +62,16 @@ export type DicomImageViewSkiaProps = {
   enableGestures?: boolean;
   /** Called after each gesture update with the current transform. */
   onTransformChange?: (transform: ViewerTransform) => void;
+  /**
+   * Phase 3.4 — multi-frame support. Defaults to 1.
+   * extractPixelDataToFile concatenates every frame into a single buffer
+   * (frame0_bytes ++ frame1_bytes ++ …). When numberOfFrames > 1 we slice
+   * the buffer at frame boundaries; frameIndex picks which slice to upload.
+   * The whole buffer is read once and cached; only the SkImage texture is
+   * re-built on frame change, so cine playback stays smooth.
+   */
+  numberOfFrames?: number;
+  frameIndex?: number;
 };
 
 /**
@@ -188,9 +198,23 @@ export function DicomImageViewSkia(props: DicomImageViewSkiaProps) {
     onError,
     enableGestures = true,
     onTransformChange,
+    numberOfFrames = 1,
+    frameIndex = 0,
   } = props;
 
+  const totalFrames = Math.max(1, Math.floor(numberOfFrames));
+  const safeFrameIndex = Math.max(
+    0,
+    Math.min(totalFrames - 1, Math.floor(frameIndex))
+  );
+
   const [skImage, setSkImage] = useState<SkImageType | null>(null);
+  // Cached raw pixel buffer (full file, all frames). Read once per
+  // filePath/geometry change so cine playback doesn't re-hit disk.
+  const bufferRef = useRef<Uint8Array | null>(null);
+  // Re-render trigger when the cached buffer is replaced — useState is
+  // overkill (we don't read the value), so a counter does it.
+  const [bufferEpoch, setBufferEpoch] = useState(0);
   const { transform, composedGesture } = useViewerGestures();
 
   // Notify the consumer whenever gestures change the transform. Effect
@@ -206,15 +230,51 @@ export function DicomImageViewSkia(props: DicomImageViewSkiaProps) {
     []
   );
 
-  // Read + upload the texture once per `filePath / geometry` change.
+  // Read the file once per `filePath / geometry` change. Bytes are cached
+  // in `bufferRef`; the per-frame upload effect below slices into it.
   useEffect(() => {
     let cancelled = false;
     try {
       const t0 = Date.now();
       const latin1 = readBinaryFile(filePath, maxFileBytes);
       const bytes = bytesFromLatin1Local(latin1);
+      if (!cancelled) {
+        bufferRef.current = bytes;
+        setBufferEpoch((e) => e + 1);
+        onReady?.({ uploadMs: Date.now() - t0 });
+      }
+    } catch (err) {
+      if (!cancelled) onError?.(err as Error);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [filePath, maxFileBytes, onReady, onError]);
+
+  // Upload the requested frame as a Skia texture. Re-runs whenever
+  // bufferEpoch (= file change), frameIndex, or geometry changes. The W/L
+  // shader reuses the texture across slider movement; no upload there.
+  useEffect(() => {
+    const buffer = bufferRef.current;
+    if (!buffer) return;
+    try {
       const numPixels = rows * columns;
-      const rgba = packPixelsToRgba(bytes, bitsAllocated, numPixels);
+      const bytesPerPixel = bitsAllocated <= 8 ? 1 : 2;
+      const frameBytes = numPixels * bytesPerPixel;
+
+      // Bounds check: frameIndex outside the buffer means a corrupt or
+      // mis-declared file. Better to surface than to render a torn image.
+      const start = safeFrameIndex * frameBytes;
+      if (start + frameBytes > buffer.length) {
+        throw new Error(
+          `frame ${safeFrameIndex} out of range (buffer ${buffer.length}B, ` +
+            `expected ${(safeFrameIndex + 1) * frameBytes}B for ` +
+            `${totalFrames} frames of ${frameBytes}B each)`
+        );
+      }
+      const slice = buffer.subarray(start, start + frameBytes);
+
+      const rgba = packPixelsToRgba(slice, bitsAllocated, numPixels);
       const data = Skia.Data.fromBytes(rgba);
       const img = Skia.Image.MakeImage(
         {
@@ -226,20 +286,20 @@ export function DicomImageViewSkia(props: DicomImageViewSkiaProps) {
         data,
         columns * 4
       );
-      if (!img) {
-        throw new Error('Skia.Image.MakeImage returned null');
-      }
-      if (!cancelled) {
-        setSkImage(img);
-        onReady?.({ uploadMs: Date.now() - t0 });
-      }
+      if (!img) throw new Error('Skia.Image.MakeImage returned null');
+      setSkImage(img);
     } catch (err) {
-      if (!cancelled) onError?.(err as Error);
+      onError?.(err as Error);
     }
-    return () => {
-      cancelled = true;
-    };
-  }, [filePath, rows, columns, bitsAllocated, maxFileBytes, onReady, onError]);
+  }, [
+    bufferEpoch,
+    safeFrameIndex,
+    totalFrames,
+    rows,
+    columns,
+    bitsAllocated,
+    onError,
+  ]);
 
   if (!skImage || !wlEffect) {
     return <View style={[{ width, height }, style]} />;

@@ -136,7 +136,8 @@ Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeGetGdcmVersion(
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeWriteSyntheticDicom(
-    JNIEnv* env, jobject /* this */, jstring jPath, jstring jTsUID) {
+    JNIEnv* env, jobject /* this */, jstring jPath, jstring jTsUID,
+    jint jNumFrames) {
   const char* cPath = env->GetStringUTFChars(jPath, nullptr);
   if (cPath == nullptr) {
     throwJavaRuntime(env, "writeSyntheticDicom: null path");
@@ -155,7 +156,7 @@ Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeWriteSyntheticDico
   }
 
   try {
-    vnd::writeSyntheticDicomFile(path, tsUID);
+    vnd::writeSyntheticDicomFile(path, tsUID, static_cast<int>(jNumFrames));
   } catch (const std::exception& e) {
     throwJavaRuntime(env, e.what());
     return nullptr;

@@ -10,21 +10,24 @@ import Foundation
   }
 
   @objc public static func writeSyntheticDicom(
-    _ transferSyntaxUID: NSString
+    _ transferSyntaxUID: NSString,
+    numberOfFrames: NSNumber
   ) throws -> NSString {
     let dir = NSTemporaryDirectory()
     let tag =
       (transferSyntaxUID as String).isEmpty
         ? "default"
         : (transferSyntaxUID as String)
+    let frames = max(1, numberOfFrames.intValue)
     let fileName =
-      "vnd-synthetic-\(tag)-\(Int(Date().timeIntervalSince1970 * 1000)).dcm"
+      "vnd-synthetic-\(tag)-\(frames)f-\(Int(Date().timeIntervalSince1970 * 1000)).dcm"
     let path = (dir as NSString).appendingPathComponent(fileName)
     // Obj-C `+(BOOL)…error:` is imported by Swift as a throwing function
     // returning Void; the NSError is rethrown automatically.
     try GdcmBridge.writeSyntheticDicom(
       atPath: path,
-      transferSyntaxUID: transferSyntaxUID as String
+      transferSyntaxUID: transferSyntaxUID as String,
+      numberOfFrames: frames
     )
     return path as NSString
   }
