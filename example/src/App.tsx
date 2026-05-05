@@ -7,7 +7,11 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import {
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
+} from 'react-native-gesture-handler';
 import {
   multiply,
   getGdcmVersion,
@@ -27,6 +31,13 @@ import {
   type ViewerTransform,
   // Phase 3.4 — cine playback
   useFrameSequence,
+  // Phase 4.1 — measurements
+  MeasurementOverlay,
+  useMeasurementsReducer,
+  canvasToImage,
+  computeResult,
+  formatResult,
+  type MeasurementToolKind,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -143,6 +154,8 @@ function App() {
   // Phase 3.4 — path of the multi-frame synthetic file used by the cine panel.
   const [cinePath, setCinePath] = useState<string | null>(null);
   const [cineErr, setCineErr] = useState<string | null>(null);
+  // Phase 4.1 — measurement state.
+  const measurements = useMeasurementsReducer();
 
   useEffect(() => {
     try {
@@ -521,23 +534,51 @@ function App() {
           <Text style={styles.label}>
             Same W/L sliders above drive both viewers.
           </Text>
-          <View style={styles.viewerWrapper}>
-            <DicomImageViewSkia
-              filePath={perf.info.filePath}
-              rows={perf.info.rows}
-              columns={perf.info.columns}
-              bitsAllocated={perf.info.bitsAllocated}
-              photometricInterpretation={perf.info.photometricInterpretation}
-              windowCenter={wc}
-              windowWidth={ww}
-              width={256}
-              height={256}
-              enableGestures
-              onReady={(info) => setSkiaUpload(info)}
-              onError={(err) => setSkiaErr(err.message)}
-              onTransformChange={(t) => setTransform(t)}
-            />
-          </View>
+          <GestureDetector
+            gesture={Gesture.Tap()
+              .enabled(measurements.tool !== null)
+              .onEnd((e) => {
+                const p = canvasToImage(
+                  e.x,
+                  e.y,
+                  perf.info.columns,
+                  perf.info.rows,
+                  256,
+                  256,
+                  transform
+                );
+                measurements.addPoint(p);
+              })}
+          >
+            <View style={styles.viewerWrapper}>
+              <DicomImageViewSkia
+                filePath={perf.info.filePath}
+                rows={perf.info.rows}
+                columns={perf.info.columns}
+                bitsAllocated={perf.info.bitsAllocated}
+                photometricInterpretation={perf.info.photometricInterpretation}
+                windowCenter={wc}
+                windowWidth={ww}
+                width={256}
+                height={256}
+                enableGestures={measurements.tool === null}
+                onReady={(info) => setSkiaUpload(info)}
+                onError={(err) => setSkiaErr(err.message)}
+                onTransformChange={(t) => setTransform(t)}
+              />
+              <View style={styles.overlayLayer} pointerEvents="none">
+                <MeasurementOverlay
+                  width={256}
+                  height={256}
+                  imageColumns={perf.info.columns}
+                  imageRows={perf.info.rows}
+                  transform={transform}
+                  measurements={measurements.measurements}
+                  draft={measurements.draft}
+                />
+              </View>
+            </View>
+          </GestureDetector>
           {skiaUpload && (
             <Text style={styles.label}>
               texture uploaded in {skiaUpload.uploadMs} ms · W/L applied on GPU
@@ -564,6 +605,61 @@ function App() {
           >
             Reset transform
           </Text>
+
+          <Text style={styles.label}>Measurement tool (Phase 4.1)</Text>
+          <View style={styles.sliderRow}>
+            {(['linear', 'angle', 'roi-rect'] as MeasurementToolKind[]).map(
+              (k) => {
+                const active = measurements.tool === k;
+                return (
+                  <Text
+                    key={k}
+                    style={[
+                      styles.toolButton,
+                      active && styles.toolButtonActive,
+                    ]}
+                    onPress={() => measurements.selectTool(active ? null : k)}
+                  >
+                    {k}
+                  </Text>
+                );
+              }
+            )}
+          </View>
+          {measurements.draft && (
+            <Text style={styles.label}>
+              placing {measurements.draft.kind} ·{' '}
+              {measurements.draft.points.length} pt
+              {measurements.draft.points.length === 1 ? '' : 's'} so far
+            </Text>
+          )}
+          {measurements.measurements.length > 0 && (
+            <View style={styles.block}>
+              <Text style={styles.label}>
+                Measurements ({measurements.measurements.length})
+              </Text>
+              {measurements.measurements.map((m) => {
+                const ps = getPixelSpacing(reference?.dataset ?? {});
+                const r = computeResult(m, ps);
+                return (
+                  <View key={m.id} style={styles.measRow}>
+                    <Text style={styles.value}>
+                      {m.kind}: {formatResult(r)}
+                    </Text>
+                    <Text
+                      style={styles.miniButton}
+                      onPress={() => measurements.remove(m.id)}
+                    >
+                      ✕
+                    </Text>
+                  </View>
+                );
+              })}
+              <Text style={styles.sliderButton} onPress={measurements.clearAll}>
+                Clear all
+              </Text>
+            </View>
+          )}
         </View>
       ) : (
         <Text style={styles.label}>Waiting for pixel data…</Text>
@@ -702,6 +798,41 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
     minWidth: 60,
     textAlign: 'center',
+  },
+  toolButton: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0a66c2',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#eef',
+    borderRadius: 6,
+  },
+  toolButtonActive: {
+    color: '#fff',
+    backgroundColor: '#0a66c2',
+  },
+  measRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#eee',
+  },
+  miniButton: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#cf222e',
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+  },
+  overlayLayer: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    width: 256,
+    height: 256,
   },
   viewerWrapper: {
     marginTop: 12,

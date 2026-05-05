@@ -26,6 +26,27 @@ export {
   encodeRgbaPng,
   pngBytesToDataUri,
 } from './viewer';
+// Phase 4.1 — measurements (linear, angle, ROI).
+export {
+  MeasurementOverlay,
+  type MeasurementOverlayProps,
+  useMeasurementsReducer,
+  type UseMeasurementsResult,
+  measurementsReducer,
+  computeResult,
+  formatResult,
+  pixelDistance,
+  distanceMm,
+  canvasToImage,
+  type ImagePoint,
+  type LinearMeasurement,
+  type AngleMeasurement,
+  type RoiRectMeasurement,
+  type Measurement,
+  type MeasurementToolKind,
+  type MeasurementResult,
+  type PixelSpacingMm,
+} from './measurements';
 export type {
   DicomElement,
   DicomDataset,

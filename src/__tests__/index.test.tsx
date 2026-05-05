@@ -8,15 +8,22 @@ jest.mock('@shopify/react-native-skia', () => ({
   AlphaType: { Opaque: 1 },
   ColorType: { RGBA_8888: 4 },
   Canvas: () => null,
+  Circle: () => null,
   Fill: () => null,
   Group: () => null,
   Image: () => null,
+  Line: () => null,
+  Path: () => null,
   Shader: () => null,
   ImageShader: () => null,
+  Text: () => null,
+  matchFont: () => null,
+  vec: (x: number, y: number) => ({ x, y }),
   Skia: {
     RuntimeEffect: { Make: () => null },
     Data: { fromBytes: () => null },
     Image: { MakeImage: () => null },
+    Path: { Make: () => ({ addArc: () => null, addRect: () => null }) },
   },
 }));
 
@@ -28,6 +35,7 @@ jest.mock('react-native-gesture-handler', () => {
       onUpdate: () => obj,
       onBegin: () => obj,
       onEnd: () => obj,
+      enabled: () => obj,
     };
     return obj;
   };
@@ -40,6 +48,7 @@ jest.mock('react-native-gesture-handler', () => {
       Pinch: chain,
       Rotation: chain,
       Simultaneous: chain,
+      Tap: chain,
     },
   };
 });
