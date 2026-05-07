@@ -64,6 +64,34 @@ describe('measurements reducer', () => {
     expect(s.measurements[0]?.kind).toBe('angle');
   });
 
+  it('bidirectional commits after 4 points', () => {
+    let s = measurementsReducer(INITIAL, {
+      type: 'select-tool',
+      tool: 'bidirectional',
+    });
+    s = measurementsReducer(s, { type: 'add-point', point: p(0, 0) });
+    s = measurementsReducer(s, { type: 'add-point', point: p(10, 0) });
+    s = measurementsReducer(s, { type: 'add-point', point: p(5, -3) });
+    expect(s.measurements).toHaveLength(0);
+    s = measurementsReducer(s, { type: 'add-point', point: p(5, 3) });
+    expect(s.measurements).toHaveLength(1);
+    expect(s.measurements[0]?.kind).toBe('bidirectional');
+  });
+
+  it('cobb commits after 4 points', () => {
+    let s = measurementsReducer(INITIAL, {
+      type: 'select-tool',
+      tool: 'cobb',
+    });
+    s = measurementsReducer(s, { type: 'add-point', point: p(0, 0) });
+    s = measurementsReducer(s, { type: 'add-point', point: p(10, 0) });
+    s = measurementsReducer(s, { type: 'add-point', point: p(0, 5) });
+    expect(s.measurements).toHaveLength(0);
+    s = measurementsReducer(s, { type: 'add-point', point: p(10, 5) });
+    expect(s.measurements).toHaveLength(1);
+    expect(s.measurements[0]?.kind).toBe('cobb');
+  });
+
   it('roi-rect commits after 2 points', () => {
     let s = measurementsReducer(INITIAL, {
       type: 'select-tool',

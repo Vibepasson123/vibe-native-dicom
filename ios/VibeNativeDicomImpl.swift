@@ -68,4 +68,23 @@ import Foundation
     )
     return s as NSString
   }
+
+  @objc public static func exportBasicTextSr(
+    _ outPath: NSString,
+    linesJson: NSString,
+    sourceStudyInstanceUID: NSString,
+    sourceSeriesInstanceUID: NSString,
+    sourceSopInstanceUID: NSString,
+    sourceSopClassUID: NSString
+  ) throws -> NSString {
+    let written = try GdcmBridge.writeBasicTextSr(
+      atPath: outPath as String,
+      linesJson: linesJson as String,
+      sourceStudyInstanceUID: sourceStudyInstanceUID as String,
+      sourceSeriesInstanceUID: sourceSeriesInstanceUID as String,
+      sourceSopInstanceUID: sourceSopInstanceUID as String,
+      sourceSopClassUID: sourceSopClassUID as String
+    )
+    return written as NSString
+  }
 }

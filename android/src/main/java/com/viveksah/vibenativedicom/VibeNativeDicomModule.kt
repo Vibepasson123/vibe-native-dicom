@@ -62,6 +62,24 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
     return nativeReadBinaryFile(path, maxBytes)
   }
 
+  override fun exportBasicTextSr(
+    outPath: String,
+    measurementLinesJson: String,
+    sourceStudyInstanceUID: String,
+    sourceSeriesInstanceUID: String,
+    sourceSopInstanceUID: String,
+    sourceSopClassUID: String
+  ): String {
+    return nativeExportBasicTextSr(
+      outPath,
+      measurementLinesJson,
+      sourceStudyInstanceUID,
+      sourceSeriesInstanceUID,
+      sourceSopInstanceUID,
+      sourceSopClassUID
+    )
+  }
+
   // Implemented in libVibeNativeDicom.so (Android NDK build of
   // android/src/main/cpp/VibeNativeDicom-jni.cpp). Loaded by the static
   // initializer below.
@@ -82,6 +100,14 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
   private external fun nativeReadBinaryFile(
     path: String,
     maxBytes: Double
+  ): String
+  private external fun nativeExportBasicTextSr(
+    outPath: String,
+    measurementLinesJson: String,
+    sourceStudyInstanceUID: String,
+    sourceSeriesInstanceUID: String,
+    sourceSopInstanceUID: String,
+    sourceSopClassUID: String
   ): String
 
   companion object {

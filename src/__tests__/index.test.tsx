@@ -119,6 +119,14 @@ jest.mock('../NativeVibeNativeDicom', () => {
           hasPixelData: true,
         };
       },
+      exportBasicTextSr: (
+        outPath: string,
+        _linesJson: string,
+        _studyUID: string,
+        _seriesUID: string,
+        _sopUID: string,
+        _sopClassUID: string
+      ) => outPath,
       readDicom: (path: string) => {
         const uidMatch = path.match(/vnd-synthetic-([0-9.]+|default)/);
         const uid = uidMatch?.[1];

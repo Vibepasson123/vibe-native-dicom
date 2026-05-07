@@ -8,6 +8,8 @@
 
 import type {
   AngleMeasurement,
+  BidirectionalMeasurement,
+  CobbMeasurement,
   ImagePoint,
   LinearMeasurement,
   Measurement,
@@ -39,13 +41,29 @@ export function distanceMm(
   return Math.sqrt(dxMm * dxMm + dyMm * dyMm);
 }
 
+/** Narrow result types — returned by individual computers below. */
+export type LengthResult = { kind: 'length'; value: number; unit: 'mm' | 'px' };
+export type AngleResult = { kind: 'angle'; value: number; unit: 'deg' };
+export type AreaResult = {
+  kind: 'area';
+  value: number;
+  unit: 'mm²' | 'px²';
+};
+export type BidirectionalResult = {
+  kind: 'bidirectional';
+  longAxis: number;
+  shortAxis: number;
+  unit: 'mm' | 'px';
+  perpendicularityError: number;
+};
+
 /**
  * Linear measurement → length in mm if spacing is available, else px.
  */
 export function linearResult(
   m: LinearMeasurement,
   spacing: PixelSpacingMm | null
-): MeasurementResult {
+): LengthResult {
   if (spacing) {
     return {
       kind: 'length',
@@ -65,7 +83,7 @@ export function linearResult(
  * Uses atan2 of the cross + dot products — robust against axis-aligned
  * vectors and zero-length edges.
  */
-export function angleResult(m: AngleMeasurement): MeasurementResult {
+export function angleResult(m: AngleMeasurement): AngleResult {
   const [p0, p1, p2] = m.points;
   const v1x = p0.x - p1.x;
   const v1y = p0.y - p1.y;
@@ -85,7 +103,7 @@ export function angleResult(m: AngleMeasurement): MeasurementResult {
 export function roiRectResult(
   m: RoiRectMeasurement,
   spacing: PixelSpacingMm | null
-): MeasurementResult {
+): AreaResult {
   const dx = Math.abs(m.points[1].x - m.points[0].x);
   const dy = Math.abs(m.points[1].y - m.points[0].y);
   if (spacing) {
@@ -96,6 +114,58 @@ export function roiRectResult(
     };
   }
   return { kind: 'area', value: dx * dy, unit: 'px²' };
+}
+
+/**
+ * Bidirectional (RECIST): long-axis length, short-axis length, and the
+ * deviation of the second line from perpendicular to the first.
+ * `perpendicularityError = 90 - |angle between the two lines|`.
+ */
+export function bidirectionalResult(
+  m: BidirectionalMeasurement,
+  spacing: PixelSpacingMm | null
+): BidirectionalResult {
+  const [la, lb, sa, sb] = m.points;
+  const longLen = spacing ? distanceMm(la, lb, spacing) : pixelDistance(la, lb);
+  const shortLen = spacing
+    ? distanceMm(sa, sb, spacing)
+    : pixelDistance(sa, sb);
+  // Angle between the two lines: use vectors v1, v2 and atan2 of
+  // cross/dot — but the line-angle is min(θ, 180-θ) so we take the
+  // smaller of the two.
+  const v1x = lb.x - la.x;
+  const v1y = lb.y - la.y;
+  const v2x = sb.x - sa.x;
+  const v2y = sb.y - sa.y;
+  const cross = v1x * v2y - v1y * v2x;
+  const dot = v1x * v2x + v1y * v2y;
+  let degrees = (Math.abs(Math.atan2(cross, dot)) * 180) / Math.PI;
+  if (degrees > 90) degrees = 180 - degrees;
+  const perpendicularityError = 90 - degrees;
+  return {
+    kind: 'bidirectional',
+    longAxis: longLen,
+    shortAxis: shortLen,
+    unit: spacing ? 'mm' : 'px',
+    perpendicularityError,
+  };
+}
+
+/**
+ * Cobb angle: angle between two lines defined by two endpoint pairs.
+ * Reported in [0, 90]°.
+ */
+export function cobbResult(m: CobbMeasurement): AngleResult {
+  const [a1, a2, b1, b2] = m.points;
+  const v1x = a2.x - a1.x;
+  const v1y = a2.y - a1.y;
+  const v2x = b2.x - b1.x;
+  const v2y = b2.y - b1.y;
+  const cross = v1x * v2y - v1y * v2x;
+  const dot = v1x * v2x + v1y * v2y;
+  let degrees = (Math.abs(Math.atan2(cross, dot)) * 180) / Math.PI;
+  if (degrees > 90) degrees = 180 - degrees;
+  return { kind: 'angle', value: degrees, unit: 'deg' };
 }
 
 /** Polymorphic dispatcher — returns the correct result for any kind. */
@@ -110,17 +180,37 @@ export function computeResult(
       return angleResult(m);
     case 'roi-rect':
       return roiRectResult(m, spacing);
+    case 'bidirectional':
+      return bidirectionalResult(m, spacing);
+    case 'cobb':
+      return cobbResult(m);
   }
 }
 
-/** Format a result for display. Three significant figures by default. */
-export function formatResult(result: MeasurementResult): string {
-  const { value, unit } = result;
-  // For angles, integer degrees are conventional in clinical viewers.
-  if (unit === 'deg') return `${value.toFixed(1)} ${unit}`;
-  // 3 sig-figs for everything else, with a fallback for zero/very-small.
+/** Format a single value with 3 significant figures. */
+function formatValue(value: number, unit: string): string {
   if (value === 0) return `0 ${unit}`;
   const magnitude = Math.floor(Math.log10(Math.abs(value)));
   const decimals = Math.max(0, 2 - magnitude);
   return `${value.toFixed(decimals)} ${unit}`;
+}
+
+/** Format a result for display. Three significant figures by default. */
+export function formatResult(result: MeasurementResult): string {
+  if (result.kind === 'bidirectional') {
+    const { longAxis, shortAxis, unit, perpendicularityError } = result;
+    const long = formatValue(longAxis, unit);
+    const short = formatValue(shortAxis, unit);
+    // Flag when the user's two axes are visibly off from perpendicular.
+    // 5° is the rule-of-thumb threshold radiologists use.
+    const flag =
+      Math.abs(perpendicularityError) > 5
+        ? ` (⚠ ${perpendicularityError.toFixed(0)}° off perpendicular)`
+        : '';
+    return `${long} × ${short}${flag}`;
+  }
+  const { value, unit } = result;
+  // For angles, integer degrees are conventional in clinical viewers.
+  if (unit === 'deg') return `${value.toFixed(1)} ${unit}`;
+  return formatValue(value, unit);
 }

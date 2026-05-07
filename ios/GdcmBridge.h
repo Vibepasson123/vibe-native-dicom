@@ -57,6 +57,19 @@ NS_ASSUME_NONNULL_BEGIN
                                     maxBytes:(double)maxBytes
                                        error:(NSError **)error;
 
+// Phase 4.2 — write a Basic Text Structured Report (DICOM PS3.4 §A.35.1.4)
+// to `outPath` containing the supplied measurement lines. Each line
+// becomes a TEXT content item. The SR is linked to the source image via
+// (0040,A375) Current Requested Procedure Evidence Sequence.
+// `linesJson` is a JSON-encoded array of strings.
++ (nullable NSString *)writeBasicTextSrAtPath:(NSString *)outPath
+                                     linesJson:(NSString *)linesJson
+                            sourceStudyInstanceUID:(NSString *)studyUID
+                           sourceSeriesInstanceUID:(NSString *)seriesUID
+                              sourceSopInstanceUID:(NSString *)sopUID
+                                 sourceSopClassUID:(NSString *)sopClassUID
+                                             error:(NSError **)error;
+
 @end
 
 NS_ASSUME_NONNULL_END

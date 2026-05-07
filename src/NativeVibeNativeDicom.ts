@@ -59,6 +59,22 @@ export interface Spec extends TurboModule {
   // maxBytes=0 for unlimited; values >0 cap memory usage and throw if
   // the file is larger.
   readBinaryFile(path: string, maxBytes: number): string;
+
+  // Phase 4.2 (SR-0023): write a Basic Text Structured Report (DICOM SOP
+  // Class 1.2.840.10008.5.1.4.1.1.88.11) containing the supplied
+  // measurement lines. The SR references the source image via
+  // (0040,A375) Current Requested Procedure Evidence Sequence, so a
+  // PACS can correlate the report to the slice the user measured on.
+  // Returns the path written. Lines is passed as a JSON-encoded
+  // string-array — codegen rejects array-of-string at the spec level.
+  exportBasicTextSr(
+    outPath: string,
+    measurementLinesJson: string,
+    sourceStudyInstanceUID: string,
+    sourceSeriesInstanceUID: string,
+    sourceSopInstanceUID: string,
+    sourceSopClassUID: string
+  ): string;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('VibeNativeDicom');

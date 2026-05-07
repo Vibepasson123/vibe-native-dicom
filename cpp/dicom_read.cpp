@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <functional>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -15,6 +16,7 @@
 #include "gdcmImageReader.h"
 #include "gdcmImageWriter.h"
 #include "gdcmItem.h"
+#include "gdcmWriter.h"
 #include "gdcmReader.h"
 #include "gdcmSequenceOfItems.h"
 #include "gdcmSmartPointer.h"
@@ -572,6 +574,185 @@ std::string readBinaryFileAsLatin1(const std::string& path,
         std::string("readBinaryFile: short read: ") + path);
   }
   return out;
+}
+
+// ---- Phase 4.2: Basic Text SR writer --------------------------------------
+
+namespace {
+
+// Helper: set a string-valued data element on a dataset.
+void setSrText(gdcm::DataSet& ds, uint16_t group, uint16_t element,
+               gdcm::VR vr, const std::string& value) {
+  gdcm::DataElement de(gdcm::Tag(group, element));
+  de.SetVR(vr);
+  de.SetByteValue(value.c_str(), static_cast<uint32_t>(value.size()));
+  ds.Replace(de);
+}
+
+// Build a single Item with its NestedDataSet pre-filled by `populate`.
+gdcm::Item makeSrItem(const std::function<void(gdcm::DataSet&)>& populate) {
+  gdcm::Item item;
+  item.SetVLToUndefined();
+  populate(item.GetNestedDataSet());
+  return item;
+}
+
+// Build a single Concept Name Code Sequence (0040,A043) — required on
+// every SR content item that has a meaning. We use the DCM (DICOM
+// Controlled Terminology) coding scheme for concept names.
+void addCodedConcept(gdcm::DataSet& ds, uint16_t group, uint16_t element,
+                     const char* codeValue, const char* codingSchemeDesignator,
+                     const char* codeMeaning) {
+  gdcm::SmartPointer<gdcm::SequenceOfItems> seq = new gdcm::SequenceOfItems();
+  seq->SetLengthToUndefined();
+  seq->AddItem(makeSrItem([&](gdcm::DataSet& itemDs) {
+    setSrText(itemDs, 0x0008, 0x0100, gdcm::VR::SH, codeValue);
+    setSrText(itemDs, 0x0008, 0x0102, gdcm::VR::SH, codingSchemeDesignator);
+    setSrText(itemDs, 0x0008, 0x0104, gdcm::VR::LO, codeMeaning);
+  }));
+  gdcm::DataElement seqDe(gdcm::Tag(group, element));
+  seqDe.SetVR(gdcm::VR::SQ);
+  seqDe.SetValue(*seq);
+  seqDe.SetVLToUndefined();
+  ds.Replace(seqDe);
+}
+
+}  // namespace
+
+void writeBasicTextSr(const std::string& outPath,
+                      const std::vector<std::string>& measurementLines,
+                      const SrExportRefs& refs) {
+  gdcm::Writer writer;
+  writer.SetFileName(outPath.c_str());
+  gdcm::DataSet& ds = writer.GetFile().GetDataSet();
+  gdcm::FileMetaInformation& meta = writer.GetFile().GetHeader();
+  meta.SetDataSetTransferSyntax(
+      gdcm::TransferSyntax(gdcm::TransferSyntax::ExplicitVRLittleEndian));
+
+  gdcm::UIDGenerator uid;
+  const char* sopClassUID = "1.2.840.10008.5.1.4.1.1.88.11";  // Basic Text SR
+  const std::string sopInstanceUID = uid.Generate();
+  // The SR is a NEW Series within the SAME Study as the source image —
+  // PACS group SR alongside the images they describe.
+  const std::string srSeriesUID = uid.Generate();
+
+  // SOP Common (PS3.3 C.12.1).
+  setSrText(ds, 0x0008, 0x0016, gdcm::VR::UI, sopClassUID);
+  setSrText(ds, 0x0008, 0x0018, gdcm::VR::UI, sopInstanceUID);
+
+  // Patient module (Type 2 — empty values are valid). A consumer-side
+  // round trip would copy these from the source image; for Phase 4.2
+  // we emit empty placeholders.
+  setSrText(ds, 0x0010, 0x0010, gdcm::VR::PN, "");          // PatientName
+  setSrText(ds, 0x0010, 0x0020, gdcm::VR::LO, "");          // PatientID
+  setSrText(ds, 0x0010, 0x0030, gdcm::VR::DA, "");          // BirthDate
+  setSrText(ds, 0x0010, 0x0040, gdcm::VR::CS, "");          // Sex
+
+  // Study module — point at the SOURCE study.
+  setSrText(ds, 0x0020, 0x000D, gdcm::VR::UI,
+            refs.sourceStudyInstanceUID);
+  setSrText(ds, 0x0008, 0x0020, gdcm::VR::DA, "");
+  setSrText(ds, 0x0008, 0x0030, gdcm::VR::TM, "");
+  setSrText(ds, 0x0008, 0x0050, gdcm::VR::SH, "");
+  setSrText(ds, 0x0020, 0x0010, gdcm::VR::SH, "");
+
+  // SR Document Series module (PS3.3 C.17.1).
+  setSrText(ds, 0x0020, 0x000E, gdcm::VR::UI, srSeriesUID);
+  setSrText(ds, 0x0008, 0x0060, gdcm::VR::CS, "SR");
+  setSrText(ds, 0x0020, 0x0011, gdcm::VR::IS, "999");
+
+  // General Equipment module (Type 2 — empty Manufacturer is valid).
+  setSrText(ds, 0x0008, 0x0070, gdcm::VR::LO,
+            "vibe-native-dicom");
+
+  // SR Document General module (PS3.3 C.17.2). InstanceNumber, ContentDate,
+  // ContentTime, CompletionFlag, VerificationFlag.
+  setSrText(ds, 0x0020, 0x0013, gdcm::VR::IS, "1");
+  setSrText(ds, 0x0040, 0xA491, gdcm::VR::CS, "PARTIAL");
+  setSrText(ds, 0x0040, 0xA493, gdcm::VR::CS, "UNVERIFIED");
+  setSrText(ds, 0x0008, 0x0023, gdcm::VR::DA, "20260101");
+  setSrText(ds, 0x0008, 0x0033, gdcm::VR::TM, "120000");
+
+  // Current Requested Procedure Evidence Sequence (0040,A375) —
+  // links the SR to the source image via { study → series → sop }.
+  if (!refs.sourceStudyInstanceUID.empty()) {
+    gdcm::SmartPointer<gdcm::SequenceOfItems> evidenceSeq =
+        new gdcm::SequenceOfItems();
+    evidenceSeq->SetLengthToUndefined();
+    evidenceSeq->AddItem(makeSrItem([&](gdcm::DataSet& studyItem) {
+      setSrText(studyItem, 0x0020, 0x000D, gdcm::VR::UI,
+                refs.sourceStudyInstanceUID);
+      // Referenced Series Sequence (0008,1115).
+      gdcm::SmartPointer<gdcm::SequenceOfItems> seriesSeq =
+          new gdcm::SequenceOfItems();
+      seriesSeq->SetLengthToUndefined();
+      seriesSeq->AddItem(makeSrItem([&](gdcm::DataSet& seriesItem) {
+        setSrText(seriesItem, 0x0020, 0x000E, gdcm::VR::UI,
+                  refs.sourceSeriesInstanceUID);
+        // Referenced SOP Sequence (0008,1199).
+        gdcm::SmartPointer<gdcm::SequenceOfItems> sopSeq =
+            new gdcm::SequenceOfItems();
+        sopSeq->SetLengthToUndefined();
+        sopSeq->AddItem(makeSrItem([&](gdcm::DataSet& sopItem) {
+          setSrText(sopItem, 0x0008, 0x1150, gdcm::VR::UI,
+                    refs.sourceSopClassUID);
+          setSrText(sopItem, 0x0008, 0x1155, gdcm::VR::UI,
+                    refs.sourceSopInstanceUID);
+        }));
+        gdcm::DataElement sopDe(gdcm::Tag(0x0008, 0x1199));
+        sopDe.SetVR(gdcm::VR::SQ);
+        sopDe.SetValue(*sopSeq);
+        sopDe.SetVLToUndefined();
+        seriesItem.Replace(sopDe);
+      }));
+      gdcm::DataElement seriesDe(gdcm::Tag(0x0008, 0x1115));
+      seriesDe.SetVR(gdcm::VR::SQ);
+      seriesDe.SetValue(*seriesSeq);
+      seriesDe.SetVLToUndefined();
+      studyItem.Replace(seriesDe);
+    }));
+    gdcm::DataElement evidenceDe(gdcm::Tag(0x0040, 0xA375));
+    evidenceDe.SetVR(gdcm::VR::SQ);
+    evidenceDe.SetValue(*evidenceSeq);
+    evidenceDe.SetVLToUndefined();
+    ds.Replace(evidenceDe);
+  }
+
+  // SR Document Content module — the top-level CONTAINER.
+  // ValueType (0040,A040) = "CONTAINER"
+  // ContinuityOfContent (0040,A050) = "SEPARATE"
+  // ConceptNameCodeSequence: DCM 121111 "Summary"
+  setSrText(ds, 0x0040, 0xA040, gdcm::VR::CS, "CONTAINER");
+  setSrText(ds, 0x0040, 0xA050, gdcm::VR::CS, "SEPARATE");
+  addCodedConcept(ds, 0x0040, 0xA043, "121111", "DCM", "Summary");
+
+  // ContentSequence (0040,A730) — one TEXT item per measurement.
+  gdcm::SmartPointer<gdcm::SequenceOfItems> contentSeq =
+      new gdcm::SequenceOfItems();
+  contentSeq->SetLengthToUndefined();
+  for (const auto& line : measurementLines) {
+    contentSeq->AddItem(makeSrItem([&](gdcm::DataSet& contentItem) {
+      // RelationshipType (0040,A010) = "CONTAINS"
+      setSrText(contentItem, 0x0040, 0xA010, gdcm::VR::CS, "CONTAINS");
+      // ValueType = "TEXT"
+      setSrText(contentItem, 0x0040, 0xA040, gdcm::VR::CS, "TEXT");
+      // Concept Name: DCM 112039 "Measurement"
+      addCodedConcept(contentItem, 0x0040, 0xA043, "112039", "DCM",
+                      "Measurement");
+      // TextValue (0040,A160) — the formatted measurement string.
+      setSrText(contentItem, 0x0040, 0xA160, gdcm::VR::UT, line);
+    }));
+  }
+  gdcm::DataElement contentDe(gdcm::Tag(0x0040, 0xA730));
+  contentDe.SetVR(gdcm::VR::SQ);
+  contentDe.SetValue(*contentSeq);
+  contentDe.SetVLToUndefined();
+  ds.Replace(contentDe);
+
+  if (!writer.Write()) {
+    throw std::runtime_error(
+        std::string("writeBasicTextSr: failed to write to ") + outPath);
+  }
 }
 
 }  // namespace vnd

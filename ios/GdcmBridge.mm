@@ -118,6 +118,47 @@ static NSDictionary *datasetToDictionary(const vnd::DicomDataset &ds) {
              : NO;
 }
 
++ (nullable NSString *)writeBasicTextSrAtPath:(NSString *)outPath
+                                     linesJson:(NSString *)linesJson
+                            sourceStudyInstanceUID:(NSString *)studyUID
+                           sourceSeriesInstanceUID:(NSString *)seriesUID
+                              sourceSopInstanceUID:(NSString *)sopUID
+                                 sourceSopClassUID:(NSString *)sopClassUID
+                                             error:(NSError **)error {
+  // Parse the lines JSON. NSJSONSerialization handles the heavy lifting.
+  NSData *jsonData =
+      [linesJson dataUsingEncoding:NSUTF8StringEncoding];
+  NSError *jsonErr = nil;
+  id parsed = [NSJSONSerialization JSONObjectWithData:jsonData
+                                              options:0
+                                                error:&jsonErr];
+  if (jsonErr || ![parsed isKindOfClass:[NSArray class]]) {
+    if (error)
+      *error = makeError(
+          std::string("writeBasicTextSr: linesJson must be a JSON array"));
+    return nil;
+  }
+  std::vector<std::string> lines;
+  for (id entry in (NSArray *)parsed) {
+    if ([entry isKindOfClass:[NSString class]]) {
+      lines.emplace_back([(NSString *)entry UTF8String]);
+    }
+  }
+
+  vnd::SrExportRefs refs;
+  refs.sourceStudyInstanceUID = std::string([studyUID UTF8String]);
+  refs.sourceSeriesInstanceUID = std::string([seriesUID UTF8String]);
+  refs.sourceSopInstanceUID = std::string([sopUID UTF8String]);
+  refs.sourceSopClassUID = std::string([sopClassUID UTF8String]);
+  try {
+    vnd::writeBasicTextSr(std::string([outPath UTF8String]), lines, refs);
+  } catch (const std::exception &e) {
+    if (error) *error = makeError(e.what());
+    return nil;
+  }
+  return outPath;
+}
+
 + (nullable NSString *)readBinaryFileAtPath:(NSString *)path
                                     maxBytes:(double)maxBytes
                                        error:(NSError **)error {

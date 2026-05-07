@@ -42,10 +42,15 @@ export {
   type LinearMeasurement,
   type AngleMeasurement,
   type RoiRectMeasurement,
+  type BidirectionalMeasurement,
+  type CobbMeasurement,
   type Measurement,
   type MeasurementToolKind,
   type MeasurementResult,
   type PixelSpacingMm,
+  exportBasicTextSr,
+  measurementsToSrLines,
+  type SrSourceRefs,
 } from './measurements';
 export type {
   DicomElement,

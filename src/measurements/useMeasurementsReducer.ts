@@ -15,6 +15,8 @@
 import { useCallback, useMemo, useReducer } from 'react';
 import type {
   AngleMeasurement,
+  BidirectionalMeasurement,
+  CobbMeasurement,
   ImagePoint,
   LinearMeasurement,
   Measurement,
@@ -26,6 +28,8 @@ const POINTS_REQUIRED: Record<MeasurementToolKind, number> = {
   'linear': 2,
   'angle': 3,
   'roi-rect': 2,
+  'bidirectional': 4,
+  'cobb': 4,
 };
 
 type Draft = {
@@ -79,6 +83,18 @@ function makeMeasurement(
         kind: 'roi-rect',
         points: [points[0]!, points[1]!],
       } satisfies RoiRectMeasurement;
+    case 'bidirectional':
+      return {
+        id,
+        kind: 'bidirectional',
+        points: [points[0]!, points[1]!, points[2]!, points[3]!],
+      } satisfies BidirectionalMeasurement;
+    case 'cobb':
+      return {
+        id,
+        kind: 'cobb',
+        points: [points[0]!, points[1]!, points[2]!, points[3]!],
+      } satisfies CobbMeasurement;
   }
 }
 

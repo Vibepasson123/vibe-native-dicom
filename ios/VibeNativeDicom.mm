@@ -72,6 +72,30 @@
   return result;
 }
 
+- (NSString *)exportBasicTextSr:(NSString *)outPath
+          measurementLinesJson:(NSString *)linesJson
+        sourceStudyInstanceUID:(NSString *)studyUID
+       sourceSeriesInstanceUID:(NSString *)seriesUID
+          sourceSopInstanceUID:(NSString *)sopUID
+             sourceSopClassUID:(NSString *)sopClassUID {
+  NSError *error = nil;
+  NSString *result =
+      [VibeNativeDicomImpl exportBasicTextSr:outPath
+                                   linesJson:linesJson
+                       sourceStudyInstanceUID:studyUID
+                      sourceSeriesInstanceUID:seriesUID
+                         sourceSopInstanceUID:sopUID
+                            sourceSopClassUID:sopClassUID
+                                       error:&error];
+  if (result == nil) {
+    @throw [NSException
+        exceptionWithName:@"VibeNativeDicomError"
+                   reason:error.localizedDescription ?: @"exportBasicTextSr failed"
+                 userInfo:nil];
+  }
+  return result;
+}
+
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
     (const facebook::react::ObjCTurboModule::InitParams &)params
 {

@@ -3,6 +3,8 @@ export type {
   LinearMeasurement,
   AngleMeasurement,
   RoiRectMeasurement,
+  BidirectionalMeasurement,
+  CobbMeasurement,
   Measurement,
   MeasurementToolKind,
   MeasurementResult,
@@ -27,3 +29,8 @@ export {
   MeasurementOverlay,
   type MeasurementOverlayProps,
 } from './MeasurementOverlay';
+export {
+  exportBasicTextSr,
+  measurementsToSrLines,
+  type SrSourceRefs,
+} from './exportSr';

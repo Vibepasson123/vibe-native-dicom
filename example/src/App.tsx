@@ -38,6 +38,8 @@ import {
   computeResult,
   formatResult,
   type MeasurementToolKind,
+  // Phase 4.2 — DICOM SR export
+  exportBasicTextSr,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -156,6 +158,9 @@ function App() {
   const [cineErr, setCineErr] = useState<string | null>(null);
   // Phase 4.1 — measurement state.
   const measurements = useMeasurementsReducer();
+  // Phase 4.2 — last exported SR file path (or error).
+  const [srPath, setSrPath] = useState<string | null>(null);
+  const [srErr, setSrErr] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -608,23 +613,26 @@ function App() {
 
           <Text style={styles.label}>Measurement tool (Phase 4.1)</Text>
           <View style={styles.sliderRow}>
-            {(['linear', 'angle', 'roi-rect'] as MeasurementToolKind[]).map(
-              (k) => {
-                const active = measurements.tool === k;
-                return (
-                  <Text
-                    key={k}
-                    style={[
-                      styles.toolButton,
-                      active && styles.toolButtonActive,
-                    ]}
-                    onPress={() => measurements.selectTool(active ? null : k)}
-                  >
-                    {k}
-                  </Text>
-                );
-              }
-            )}
+            {(
+              [
+                'linear',
+                'angle',
+                'roi-rect',
+                'bidirectional',
+                'cobb',
+              ] as MeasurementToolKind[]
+            ).map((k) => {
+              const active = measurements.tool === k;
+              return (
+                <Text
+                  key={k}
+                  style={[styles.toolButton, active && styles.toolButtonActive]}
+                  onPress={() => measurements.selectTool(active ? null : k)}
+                >
+                  {k}
+                </Text>
+              );
+            })}
           </View>
           {measurements.draft && (
             <Text style={styles.label}>
@@ -655,9 +663,55 @@ function App() {
                   </View>
                 );
               })}
-              <Text style={styles.sliderButton} onPress={measurements.clearAll}>
-                Clear all
-              </Text>
+              <View style={styles.sliderRow}>
+                <Text
+                  style={styles.sliderButton}
+                  onPress={measurements.clearAll}
+                >
+                  Clear all
+                </Text>
+                <Text
+                  style={styles.sliderButton}
+                  onPress={() => {
+                    try {
+                      const ps = getPixelSpacing(reference?.dataset ?? {});
+                      const path = `${perf.info.filePath}.sr.dcm`;
+                      const written = exportBasicTextSr(
+                        measurements.measurements,
+                        ps,
+                        path,
+                        {
+                          studyInstanceUID:
+                            reference?.dataset[
+                              '0020,000D'
+                            ]?.value?.toString() ?? '',
+                          seriesInstanceUID:
+                            reference?.dataset[
+                              '0020,000E'
+                            ]?.value?.toString() ?? '',
+                          sopInstanceUID: reference?.sopInstanceUID ?? '',
+                          sopClassUID: reference?.sopClassUID ?? '',
+                        }
+                      );
+                      setSrPath(written);
+                      setSrErr(null);
+                    } catch (err) {
+                      setSrErr((err as Error).message);
+                    }
+                  }}
+                >
+                  Export SR
+                </Text>
+              </View>
+              {srPath && (
+                <View style={styles.block}>
+                  <Text style={styles.label}>Wrote SR</Text>
+                  <Text style={styles.path} numberOfLines={2}>
+                    {srPath}
+                  </Text>
+                </View>
+              )}
+              {srErr && <Text style={styles.fail}>FAIL · {srErr}</Text>}
             </View>
           )}
         </View>

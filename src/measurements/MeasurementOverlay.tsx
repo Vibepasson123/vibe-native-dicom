@@ -23,6 +23,8 @@ import type { SkFont } from '@shopify/react-native-skia';
 import { computeResult, formatResult } from './math';
 import type {
   AngleMeasurement,
+  BidirectionalMeasurement,
+  CobbMeasurement,
   ImagePoint,
   LinearMeasurement,
   Measurement,
@@ -246,6 +248,108 @@ function RoiRectShape({
   );
 }
 
+function BidirectionalShape({
+  m,
+  project,
+  color,
+  strokeWidth,
+  label,
+  font,
+}: {
+  m: BidirectionalMeasurement;
+  project: (p: ImagePoint) => { x: number; y: number };
+  color: string;
+  strokeWidth: number;
+  label: string;
+  font: SkFont | null;
+}) {
+  const la = project(m.points[0]);
+  const lb = project(m.points[1]);
+  const sa = project(m.points[2]);
+  const sb = project(m.points[3]);
+  const labelX = (la.x + lb.x) / 2;
+  const labelY = (la.y + lb.y) / 2 - 8;
+  return (
+    <Group>
+      <Line
+        p1={vec(la.x, la.y)}
+        p2={vec(lb.x, lb.y)}
+        color={color}
+        strokeWidth={strokeWidth}
+      />
+      <Line
+        p1={vec(sa.x, sa.y)}
+        p2={vec(sb.x, sb.y)}
+        color={color}
+        strokeWidth={strokeWidth}
+      />
+      <Circle cx={la.x} cy={la.y} r={4} color={color} />
+      <Circle cx={lb.x} cy={lb.y} r={4} color={color} />
+      <Circle cx={sa.x} cy={sa.y} r={4} color={color} />
+      <Circle cx={sb.x} cy={sb.y} r={4} color={color} />
+      {font && (
+        <SkText
+          x={labelX + 6}
+          y={labelY}
+          text={label}
+          font={font}
+          color={color}
+        />
+      )}
+    </Group>
+  );
+}
+
+function CobbShape({
+  m,
+  project,
+  color,
+  strokeWidth,
+  label,
+  font,
+}: {
+  m: CobbMeasurement;
+  project: (p: ImagePoint) => { x: number; y: number };
+  color: string;
+  strokeWidth: number;
+  label: string;
+  font: SkFont | null;
+}) {
+  const a1 = project(m.points[0]);
+  const a2 = project(m.points[1]);
+  const b1 = project(m.points[2]);
+  const b2 = project(m.points[3]);
+  // Label centred on the midpoint of the two line midpoints, slightly
+  // above so it doesn't overlap the lines.
+  const ma = { x: (a1.x + a2.x) / 2, y: (a1.y + a2.y) / 2 };
+  const mb = { x: (b1.x + b2.x) / 2, y: (b1.y + b2.y) / 2 };
+  const labelX = (ma.x + mb.x) / 2;
+  const labelY = (ma.y + mb.y) / 2 - 8;
+  return (
+    <Group>
+      <Line
+        p1={vec(a1.x, a1.y)}
+        p2={vec(a2.x, a2.y)}
+        color={color}
+        strokeWidth={strokeWidth}
+      />
+      <Line
+        p1={vec(b1.x, b1.y)}
+        p2={vec(b2.x, b2.y)}
+        color={color}
+        strokeWidth={strokeWidth}
+      />
+      <Circle cx={a1.x} cy={a1.y} r={4} color={color} />
+      <Circle cx={a2.x} cy={a2.y} r={4} color={color} />
+      <Circle cx={b1.x} cy={b1.y} r={4} color={color} />
+      <Circle cx={b2.x} cy={b2.y} r={4} color={color} />
+      {font && (
+        <SkText x={labelX} y={labelY} text={label} font={font} color={color} />
+      )}
+    </Group>
+  );
+}
+
 export function MeasurementOverlay(props: MeasurementOverlayProps) {
   const {
     width,
@@ -313,6 +417,30 @@ export function MeasurementOverlay(props: MeasurementOverlayProps) {
           case 'roi-rect':
             return (
               <RoiRectShape
+                key={m.id}
+                m={m}
+                project={project}
+                color={color}
+                strokeWidth={strokeWidth}
+                label={label}
+                font={font}
+              />
+            );
+          case 'bidirectional':
+            return (
+              <BidirectionalShape
+                key={m.id}
+                m={m}
+                project={project}
+                color={color}
+                strokeWidth={strokeWidth}
+                label={label}
+                font={font}
+              />
+            );
+          case 'cobb':
+            return (
+              <CobbShape
                 key={m.id}
                 m={m}
                 project={project}

@@ -180,4 +180,30 @@ void extractPixelDataToFile(const std::string& dicomPath,
 std::string readBinaryFileAsLatin1(const std::string& path,
                                    long long maxBytes);
 
+// Phase 4.2: Basic Text Structured Report (DICOM PS3.4 §A.35.1.4 /
+// PS3.3 SOP Class 1.2.840.10008.5.1.4.1.1.88.11) writer.
+//
+// `measurementLines` is the human-readable lines (one per measurement)
+// that get written as TEXT content items inside a CONTAINER. Each line
+// becomes a separate item — Basic Text SR is intentionally flat.
+//
+// The SR is linked to the source image via Current Requested Procedure
+// Evidence Sequence (0040,A375) referencing { studyUID, seriesUID,
+// sopUID } — required by PS3.3 C.17.2.1 so a PACS can correlate the
+// report back to the image the user measured on.
+//
+// Phase 4.2 ships Basic Text SR (the minimum viable SR). Comprehensive
+// SR with TID 1500 templated content (coded concept names, numeric
+// measurements with UCUM units) is a follow-up phase — the on-the-wire
+// PS3.10 file format doesn't change, only the dataset.
+struct SrExportRefs {
+  std::string sourceStudyInstanceUID;
+  std::string sourceSeriesInstanceUID;
+  std::string sourceSopInstanceUID;
+  std::string sourceSopClassUID;
+};
+void writeBasicTextSr(const std::string& outPath,
+                      const std::vector<std::string>& measurementLines,
+                      const SrExportRefs& refs);
+
 }  // namespace vnd
