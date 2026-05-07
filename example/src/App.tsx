@@ -40,6 +40,15 @@ import {
   type MeasurementToolKind,
   // Phase 4.2 — DICOM SR export
   exportBasicTextSr,
+  // Phase 5.1 — MPR
+  buildVolumeFromDicoms,
+  extractMprSlice,
+  releaseVolume,
+  writeSyntheticVolumeSeries,
+  useMprController,
+  type VolumeInfo,
+  type MprSliceInfo,
+  type MprPlane,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -161,6 +170,15 @@ function App() {
   // Phase 4.2 — last exported SR file path (or error).
   const [srPath, setSrPath] = useState<string | null>(null);
   const [srErr, setSrErr] = useState<string | null>(null);
+  // Phase 5.1 — MPR state.
+  const [volume, setVolume] = useState<VolumeInfo | null>(null);
+  const [mprErr, setMprErr] = useState<string | null>(null);
+  const [mprSlices, setMprSlices] = useState<{
+    axial: MprSliceInfo | null;
+    sagittal: MprSliceInfo | null;
+    coronal: MprSliceInfo | null;
+  }>({ axial: null, sagittal: null, coronal: null });
+  const mpr = useMprController(volume);
 
   useEffect(() => {
     try {
@@ -297,10 +315,53 @@ function App() {
     } catch (err) {
       setCineErr((err as Error).message);
     }
+
+    // Phase 5.1: write a 16-slice synthetic volume series + build it.
+    try {
+      // Use the same tmpdir as cine path (parent dir of any synthetic file).
+      const probe = writeSyntheticDicom(
+        TransferSyntaxUID.ImplicitVRLittleEndian,
+        1
+      );
+      const dir = probe.substring(0, probe.lastIndexOf('/'));
+      const slicePaths = writeSyntheticVolumeSeries(dir, 16, 1.0);
+      const v = buildVolumeFromDicoms(slicePaths);
+      setVolume(v);
+    } catch (err) {
+      setMprErr((err as Error).message);
+    }
   }, []);
 
   const cineFrames = 12;
   const cine = useFrameSequence({ numberOfFrames: cineFrames, fps: 8 });
+
+  // Phase 5.1: re-extract MPR slices whenever the volume handle or any
+  // index changes. Each plane writes to its own .bin file so the Skia
+  // viewer's once-per-file cache (Phase 3.4) handles re-uploads.
+  useEffect(() => {
+    if (!volume) return;
+    const planes: MprPlane[] = ['axial', 'sagittal', 'coronal'];
+    try {
+      const next = { ...mprSlices };
+      for (const p of planes) {
+        const idx = mpr.indices[p];
+        const out = `/tmp/vnd-mpr-${volume.handle}-${p}-${idx}.bin`;
+        next[p] = extractMprSlice(volume.handle, p, idx, out);
+      }
+      setMprSlices(next);
+    } catch (err) {
+      setMprErr((err as Error).message);
+    }
+    // mprSlices intentionally NOT in deps — would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [volume, mpr.indices.axial, mpr.indices.sagittal, mpr.indices.coronal]);
+
+  // Free the volume buffer when the component unmounts.
+  useEffect(() => {
+    return () => {
+      if (volume) releaseVolume(volume.handle);
+    };
+  }, [volume]);
 
   const overallPass =
     parityPass === true &&
@@ -757,6 +818,64 @@ function App() {
               ›
             </Text>
           </View>
+        </View>
+      )}
+
+      <Text style={styles.section}>MPR (Phase 5.1)</Text>
+      {mprErr && <Text style={styles.fail}>FAIL · {mprErr}</Text>}
+      {!volume && !mprErr && <ActivityIndicator />}
+      {volume && (
+        <View style={styles.block}>
+          <Text style={styles.label}>
+            16-slice synthetic volume · {volume.depth} × {volume.rows} ×{' '}
+            {volume.columns} · spacing {volume.pixelSpacingRow}/
+            {volume.pixelSpacingCol}/{volume.sliceSpacing} mm
+          </Text>
+          {(['axial', 'sagittal', 'coronal'] as MprPlane[]).map((p) => {
+            const slice = mprSlices[p];
+            const idx = mpr.indices[p];
+            const max = mpr.maxIndex[p];
+            return (
+              <View key={p} style={styles.block}>
+                <Text style={styles.label}>
+                  {p} · slice {idx + 1} / {max + 1}
+                </Text>
+                <View style={styles.viewerWrapper}>
+                  {slice && (
+                    <DicomImageViewSkia
+                      filePath={slice.filePath}
+                      rows={slice.rows}
+                      columns={slice.columns}
+                      bitsAllocated={slice.bitsAllocated}
+                      photometricInterpretation={
+                        volume.photometricInterpretation
+                      }
+                      windowCenter={128}
+                      windowWidth={256}
+                      width={192}
+                      height={192}
+                      enableGestures={false}
+                    />
+                  )}
+                </View>
+                <View style={styles.sliderRow}>
+                  <Text
+                    style={styles.sliderButton}
+                    onPress={() => mpr.step(p, -1)}
+                  >
+                    ‹
+                  </Text>
+                  <Text style={styles.sliderValue}>{idx}</Text>
+                  <Text
+                    style={styles.sliderButton}
+                    onPress={() => mpr.step(p, 1)}
+                  >
+                    ›
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
         </View>
       )}
 

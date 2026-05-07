@@ -69,6 +69,47 @@ import Foundation
     return s as NSString
   }
 
+  @objc public static func buildVolumeFromDicoms(
+    _ dicomPathsJson: NSString
+  ) throws -> NSDictionary {
+    let dict = try GdcmBridge.buildVolume(
+      fromDicomPathsJson: dicomPathsJson as String
+    )
+    return dict as NSDictionary
+  }
+
+  @objc public static func extractMprSlice(
+    _ handle: NSNumber,
+    plane: NSNumber,
+    index: NSNumber,
+    outPath: NSString
+  ) throws -> NSDictionary {
+    let dict = try GdcmBridge.extractMprSlice(
+      fromHandle: handle.doubleValue,
+      plane: plane.intValue,
+      index: index.intValue,
+      toPath: outPath as String
+    )
+    return dict as NSDictionary
+  }
+
+  @objc public static func releaseVolume(_ handle: NSNumber) {
+    GdcmBridge.releaseVolume(withHandle: handle.doubleValue)
+  }
+
+  @objc public static func writeSyntheticVolumeSeries(
+    _ outDir: NSString,
+    numberOfSlices: NSNumber,
+    sliceSpacingMm: NSNumber
+  ) throws -> NSString {
+    let json = try GdcmBridge.writeSyntheticVolumeSeries(
+      atDir: outDir as String,
+      numberOfSlices: numberOfSlices.intValue,
+      sliceSpacingMm: sliceSpacingMm.doubleValue
+    )
+    return json as NSString
+  }
+
   @objc public static func exportBasicTextSr(
     _ outPath: NSString,
     linesJson: NSString,

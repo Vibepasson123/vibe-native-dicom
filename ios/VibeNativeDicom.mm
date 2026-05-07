@@ -72,6 +72,62 @@
   return result;
 }
 
+- (id)buildVolumeFromDicoms:(NSString *)dicomPathsJson {
+  NSError *error = nil;
+  NSDictionary *result =
+      [VibeNativeDicomImpl buildVolumeFromDicoms:dicomPathsJson
+                                            error:&error];
+  if (result == nil) {
+    @throw [NSException
+        exceptionWithName:@"VibeNativeDicomError"
+                   reason:error.localizedDescription ?: @"buildVolumeFromDicoms failed"
+                 userInfo:nil];
+  }
+  return result;
+}
+
+- (id)extractMprSlice:(double)handle
+                plane:(double)plane
+                index:(double)index
+              outPath:(NSString *)outPath {
+  NSError *error = nil;
+  NSDictionary *result =
+      [VibeNativeDicomImpl extractMprSlice:@(handle)
+                                     plane:@(plane)
+                                     index:@(index)
+                                   outPath:outPath
+                                     error:&error];
+  if (result == nil) {
+    @throw [NSException
+        exceptionWithName:@"VibeNativeDicomError"
+                   reason:error.localizedDescription ?: @"extractMprSlice failed"
+                 userInfo:nil];
+  }
+  return result;
+}
+
+- (void)releaseVolume:(double)handle {
+  [VibeNativeDicomImpl releaseVolume:@(handle)];
+}
+
+- (NSString *)writeSyntheticVolumeSeries:(NSString *)outDir
+                          numberOfSlices:(double)n
+                          sliceSpacingMm:(double)spacing {
+  NSError *error = nil;
+  NSString *result =
+      [VibeNativeDicomImpl writeSyntheticVolumeSeries:outDir
+                                       numberOfSlices:@(n)
+                                       sliceSpacingMm:@(spacing)
+                                                error:&error];
+  if (result == nil) {
+    @throw [NSException
+        exceptionWithName:@"VibeNativeDicomError"
+                   reason:error.localizedDescription ?: @"writeSyntheticVolumeSeries failed"
+                 userInfo:nil];
+  }
+  return result;
+}
+
 - (NSString *)exportBasicTextSr:(NSString *)outPath
           measurementLinesJson:(NSString *)linesJson
         sourceStudyInstanceUID:(NSString *)studyUID

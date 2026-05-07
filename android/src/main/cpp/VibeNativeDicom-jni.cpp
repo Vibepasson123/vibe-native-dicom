@@ -17,6 +17,7 @@
 #include <gdcmVersion.h>
 
 #include "dicom_read.h"
+#include "dicom_volume.h"
 
 namespace {
 
@@ -417,4 +418,206 @@ Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeReadDicom(
   env->DeleteLocalRef(imgMap);
   env->DeleteLocalRef(mapCls);
   return root;
+}
+
+// ---- Phase 5.1: volume + MPR slice ----------------------------------------
+
+namespace {
+
+void putDouble(JNIEnv* env, jobject map, jmethodID putMethod, const char* key,
+               double value) {
+  jstring jKey = env->NewStringUTF(key);
+  jclass dblCls = env->FindClass("java/lang/Double");
+  jmethodID dblCtor = env->GetMethodID(dblCls, "<init>", "(D)V");
+  jobject jVal =
+      env->NewObject(dblCls, dblCtor, static_cast<jdouble>(value));
+  env->CallObjectMethod(map, putMethod, jKey, jVal);
+  env->DeleteLocalRef(jKey);
+  env->DeleteLocalRef(jVal);
+  env->DeleteLocalRef(dblCls);
+}
+
+}  // namespace
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeBuildVolumeFromDicoms(
+    JNIEnv* env, jobject /* this */, jstring jPathsJson) {
+  if (jPathsJson == nullptr) {
+    throwJavaRuntime(env, "buildVolumeFromDicoms: null paths");
+    return nullptr;
+  }
+  const char* cJson = env->GetStringUTFChars(jPathsJson, nullptr);
+  if (cJson == nullptr) {
+    throwJavaRuntime(env, "buildVolumeFromDicoms: bad paths encoding");
+    return nullptr;
+  }
+  std::string json(cJson);
+  env->ReleaseStringUTFChars(jPathsJson, cJson);
+
+  // Same minimal JSON-array-of-strings parser as the SR exporter.
+  std::vector<std::string> paths;
+  size_t i = 0;
+  auto skipWs = [&]() {
+    while (i < json.size() && (json[i] == ' ' || json[i] == '\t' ||
+                                json[i] == '\n' || json[i] == '\r'))
+      ++i;
+  };
+  skipWs();
+  if (i < json.size() && json[i] == '[') {
+    ++i;
+    skipWs();
+    while (i < json.size() && json[i] != ']') {
+      skipWs();
+      if (i >= json.size() || json[i] != '"') break;
+      ++i;
+      std::string s;
+      while (i < json.size() && json[i] != '"') {
+        if (json[i] == '\\' && i + 1 < json.size()) {
+          char esc = json[i + 1];
+          if (esc == 'n') s.push_back('\n');
+          else if (esc == 't') s.push_back('\t');
+          else s.push_back(esc);
+          i += 2;
+        } else {
+          s.push_back(json[i++]);
+        }
+      }
+      if (i < json.size()) ++i;
+      paths.push_back(std::move(s));
+      skipWs();
+      if (i < json.size() && json[i] == ',') ++i;
+      skipWs();
+    }
+  }
+
+  vnd::VolumeInfo info;
+  try {
+    info = vnd::buildVolumeFromDicoms(paths);
+  } catch (const std::exception& e) {
+    throwJavaRuntime(env, e.what());
+    return nullptr;
+  }
+
+  jclass mapCls = env->FindClass("java/util/HashMap");
+  jmethodID mapCtor = env->GetMethodID(mapCls, "<init>", "()V");
+  jmethodID putMethod = env->GetMethodID(
+      mapCls, "put",
+      "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+  jobject root = newHashMap(env, mapCls, mapCtor);
+  putDouble(env, root, putMethod, "handle",
+            static_cast<double>(info.handle));
+  putInt(env, root, putMethod, "columns", info.columns);
+  putInt(env, root, putMethod, "rows", info.rows);
+  putInt(env, root, putMethod, "depth", info.depth);
+  putInt(env, root, putMethod, "bitsAllocated", info.bitsAllocated);
+  putInt(env, root, putMethod, "pixelRepresentation",
+         info.pixelRepresentation);
+  putDouble(env, root, putMethod, "pixelSpacingRow", info.pixelSpacingRow);
+  putDouble(env, root, putMethod, "pixelSpacingCol", info.pixelSpacingCol);
+  putDouble(env, root, putMethod, "sliceSpacing", info.sliceSpacing);
+  putString(env, root, putMethod, "photometricInterpretation",
+            info.photometricInterpretation);
+  env->DeleteLocalRef(mapCls);
+  return root;
+}
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeExtractMprSlice(
+    JNIEnv* env, jobject /* this */, jdouble jHandle, jint jPlane,
+    jint jIndex, jstring jOutPath) {
+  vnd::MprPlane plane;
+  switch (static_cast<int>(jPlane)) {
+    case 0: plane = vnd::MprPlane::Axial; break;
+    case 1: plane = vnd::MprPlane::Sagittal; break;
+    case 2: plane = vnd::MprPlane::Coronal; break;
+    default:
+      throwJavaRuntime(env, "extractMprSlice: invalid plane");
+      return nullptr;
+  }
+  if (jOutPath == nullptr) {
+    throwJavaRuntime(env, "extractMprSlice: null outPath");
+    return nullptr;
+  }
+  const char* cOut = env->GetStringUTFChars(jOutPath, nullptr);
+  if (cOut == nullptr) {
+    throwJavaRuntime(env, "extractMprSlice: bad outPath encoding");
+    return nullptr;
+  }
+  std::string outPath(cOut);
+  env->ReleaseStringUTFChars(jOutPath, cOut);
+
+  vnd::MprSliceInfo info;
+  try {
+    info = vnd::extractSlice(static_cast<long long>(jHandle), plane,
+                             static_cast<int>(jIndex), outPath);
+  } catch (const std::exception& e) {
+    throwJavaRuntime(env, e.what());
+    return nullptr;
+  }
+
+  jclass mapCls = env->FindClass("java/util/HashMap");
+  jmethodID mapCtor = env->GetMethodID(mapCls, "<init>", "()V");
+  jmethodID putMethod = env->GetMethodID(
+      mapCls, "put",
+      "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+  jobject root = newHashMap(env, mapCls, mapCtor);
+  putString(env, root, putMethod, "filePath", info.filePath);
+  putDouble(env, root, putMethod, "byteLength",
+            static_cast<double>(info.byteLength));
+  putInt(env, root, putMethod, "rows", info.rows);
+  putInt(env, root, putMethod, "columns", info.columns);
+  putInt(env, root, putMethod, "bitsAllocated", info.bitsAllocated);
+  putInt(env, root, putMethod, "pixelRepresentation",
+         info.pixelRepresentation);
+  putDouble(env, root, putMethod, "pixelSpacingRow", info.pixelSpacingRow);
+  putDouble(env, root, putMethod, "pixelSpacingCol", info.pixelSpacingCol);
+  env->DeleteLocalRef(mapCls);
+  return root;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeReleaseVolume(
+    JNIEnv* /* env */, jobject /* this */, jdouble jHandle) {
+  vnd::releaseVolume(static_cast<long long>(jHandle));
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeWriteSyntheticVolumeSeries(
+    JNIEnv* env, jobject /* this */, jstring jOutDir, jint jN,
+    jdouble jSpacing) {
+  if (jOutDir == nullptr) {
+    throwJavaRuntime(env, "writeSyntheticVolumeSeries: null outDir");
+    return nullptr;
+  }
+  const char* cDir = env->GetStringUTFChars(jOutDir, nullptr);
+  if (cDir == nullptr) {
+    throwJavaRuntime(env, "writeSyntheticVolumeSeries: bad encoding");
+    return nullptr;
+  }
+  std::string outDir(cDir);
+  env->ReleaseStringUTFChars(jOutDir, cDir);
+
+  std::vector<std::string> paths;
+  try {
+    paths = vnd::writeSyntheticVolumeSeries(outDir, static_cast<int>(jN),
+                                             jSpacing);
+  } catch (const std::exception& e) {
+    throwJavaRuntime(env, e.what());
+    return nullptr;
+  }
+
+  // Build a JSON array of strings inline. Escape backslashes + quotes
+  // so the output round-trips through JSON.parse on the JS side.
+  std::string out = "[";
+  for (size_t i = 0; i < paths.size(); ++i) {
+    if (i > 0) out.push_back(',');
+    out.push_back('"');
+    for (char c : paths[i]) {
+      if (c == '\\' || c == '"') out.push_back('\\');
+      out.push_back(c);
+    }
+    out.push_back('"');
+  }
+  out.push_back(']');
+  return env->NewStringUTF(out.c_str());
 }

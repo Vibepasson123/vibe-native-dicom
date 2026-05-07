@@ -70,6 +70,28 @@ NS_ASSUME_NONNULL_BEGIN
                                  sourceSopClassUID:(NSString *)sopClassUID
                                              error:(NSError **)error;
 
+// Phase 5.1 — build a 3D volume from a JSON-encoded array of DICOM file
+// paths. Returns an NSDictionary matching the JS VolumeInfo type.
++ (nullable NSDictionary *)buildVolumeFromDicomPathsJson:(NSString *)json
+                                                   error:(NSError **)error;
+
+// Phase 5.1 — extract one slice. plane: 0=axial, 1=sagittal, 2=coronal.
++ (nullable NSDictionary *)extractMprSliceFromHandle:(double)handle
+                                               plane:(NSInteger)plane
+                                               index:(NSInteger)index
+                                              toPath:(NSString *)outPath
+                                               error:(NSError **)error;
+
+// Phase 5.1 — drop the volume buffer for `handle`.
++ (void)releaseVolumeWithHandle:(double)handle;
+
+// Phase 5.1 — write a synthetic volume series; returns a JSON-encoded
+// array of slice paths.
++ (nullable NSString *)writeSyntheticVolumeSeriesAtDir:(NSString *)outDir
+                                        numberOfSlices:(NSInteger)n
+                                        sliceSpacingMm:(double)spacing
+                                                 error:(NSError **)error;
+
 @end
 
 NS_ASSUME_NONNULL_END

@@ -52,6 +52,19 @@ export {
   measurementsToSrLines,
   type SrSourceRefs,
 } from './measurements';
+// Phase 5.1 — orthogonal MPR (axial / sagittal / coronal).
+export {
+  buildVolumeFromDicoms,
+  extractMprSlice,
+  releaseVolume,
+  writeSyntheticVolumeSeries,
+  useMprController,
+  type MprPlane,
+  type MprSliceInfo,
+  type VolumeInfo,
+  type MprIndices,
+  type UseMprControllerResult,
+} from './mpr';
 export type {
   DicomElement,
   DicomDataset,

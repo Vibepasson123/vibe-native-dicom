@@ -36,6 +36,7 @@ include_directories("${VND_CPP_DIR}")
 add_library(VibeNativeDicom SHARED
   VibeNativeDicom-jni.cpp
   "${VND_CPP_DIR}/dicom_read.cpp"
+  "${VND_CPP_DIR}/dicom_volume.cpp"
 )
 
 # Static libs have to be ordered such that consumers come before providers,

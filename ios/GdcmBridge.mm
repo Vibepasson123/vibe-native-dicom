@@ -6,6 +6,7 @@
 #include <string>
 
 #include "dicom_read.h"
+#include "dicom_volume.h"
 
 static NSString *const kGdcmBridgeErrorDomain = @"VibeNativeDicom.GdcmBridge";
 
@@ -205,6 +206,114 @@ static NSDictionary *datasetToDictionary(const vnd::DicomDataset &ds) {
     @"numberOfFrames": @(info.numberOfFrames),
     @"hasPixelData": @(info.hasPixelData),
   };
+}
+
++ (nullable NSDictionary *)buildVolumeFromDicomPathsJson:(NSString *)json
+                                                   error:(NSError **)error {
+  NSData *jsonData = [json dataUsingEncoding:NSUTF8StringEncoding];
+  NSError *jsonErr = nil;
+  id parsed = [NSJSONSerialization JSONObjectWithData:jsonData
+                                              options:0
+                                                error:&jsonErr];
+  if (jsonErr || ![parsed isKindOfClass:[NSArray class]]) {
+    if (error)
+      *error = makeError(
+          std::string("buildVolumeFromDicoms: paths must be a JSON array"));
+    return nil;
+  }
+  std::vector<std::string> paths;
+  for (id entry in (NSArray *)parsed) {
+    if ([entry isKindOfClass:[NSString class]]) {
+      paths.emplace_back([(NSString *)entry UTF8String]);
+    }
+  }
+  vnd::VolumeInfo info;
+  try {
+    info = vnd::buildVolumeFromDicoms(paths);
+  } catch (const std::exception &e) {
+    if (error) *error = makeError(e.what());
+    return nil;
+  }
+  return @{
+    @"handle": @(static_cast<double>(info.handle)),
+    @"columns": @(info.columns),
+    @"rows": @(info.rows),
+    @"depth": @(info.depth),
+    @"bitsAllocated": @(info.bitsAllocated),
+    @"pixelRepresentation": @(info.pixelRepresentation),
+    @"pixelSpacingRow": @(info.pixelSpacingRow),
+    @"pixelSpacingCol": @(info.pixelSpacingCol),
+    @"sliceSpacing": @(info.sliceSpacing),
+    @"photometricInterpretation":
+        [NSString stringWithUTF8String:info.photometricInterpretation.c_str()],
+  };
+}
+
++ (nullable NSDictionary *)extractMprSliceFromHandle:(double)handle
+                                               plane:(NSInteger)plane
+                                               index:(NSInteger)index
+                                              toPath:(NSString *)outPath
+                                               error:(NSError **)error {
+  vnd::MprPlane p;
+  switch (plane) {
+    case 0: p = vnd::MprPlane::Axial; break;
+    case 1: p = vnd::MprPlane::Sagittal; break;
+    case 2: p = vnd::MprPlane::Coronal; break;
+    default:
+      if (error) *error = makeError("extractMprSlice: invalid plane");
+      return nil;
+  }
+  vnd::MprSliceInfo info;
+  try {
+    info = vnd::extractSlice(static_cast<long long>(handle), p,
+                             static_cast<int>(index),
+                             std::string([outPath UTF8String]));
+  } catch (const std::exception &e) {
+    if (error) *error = makeError(e.what());
+    return nil;
+  }
+  return @{
+    @"filePath": [NSString stringWithUTF8String:info.filePath.c_str()],
+    @"byteLength": @(static_cast<double>(info.byteLength)),
+    @"rows": @(info.rows),
+    @"columns": @(info.columns),
+    @"bitsAllocated": @(info.bitsAllocated),
+    @"pixelRepresentation": @(info.pixelRepresentation),
+    @"pixelSpacingRow": @(info.pixelSpacingRow),
+    @"pixelSpacingCol": @(info.pixelSpacingCol),
+  };
+}
+
++ (void)releaseVolumeWithHandle:(double)handle {
+  vnd::releaseVolume(static_cast<long long>(handle));
+}
+
++ (nullable NSString *)writeSyntheticVolumeSeriesAtDir:(NSString *)outDir
+                                        numberOfSlices:(NSInteger)n
+                                        sliceSpacingMm:(double)spacing
+                                                 error:(NSError **)error {
+  std::vector<std::string> paths;
+  try {
+    paths = vnd::writeSyntheticVolumeSeries(
+        std::string([outDir UTF8String]), static_cast<int>(n), spacing);
+  } catch (const std::exception &e) {
+    if (error) *error = makeError(e.what());
+    return nil;
+  }
+  NSMutableArray *arr =
+      [NSMutableArray arrayWithCapacity:paths.size()];
+  for (const auto &p : paths) {
+    [arr addObject:[NSString stringWithUTF8String:p.c_str()]];
+  }
+  NSError *jsonErr = nil;
+  NSData *data = [NSJSONSerialization dataWithJSONObject:arr
+                                                 options:0
+                                                   error:&jsonErr];
+  if (jsonErr) {
+    if (error) *error = jsonErr;
+    return nil;
+  }
+  return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
 }
 
 @end

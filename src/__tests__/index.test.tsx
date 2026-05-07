@@ -127,6 +127,45 @@ jest.mock('../NativeVibeNativeDicom', () => {
         _sopUID: string,
         _sopClassUID: string
       ) => outPath,
+      buildVolumeFromDicoms: (_pathsJson: string) => ({
+        handle: 1,
+        columns: 16,
+        rows: 16,
+        depth: 8,
+        bitsAllocated: 8,
+        pixelRepresentation: 0,
+        pixelSpacingRow: 1,
+        pixelSpacingCol: 1,
+        sliceSpacing: 1,
+        photometricInterpretation: 'MONOCHROME2',
+      }),
+      extractMprSlice: (
+        _handle: number,
+        _plane: number,
+        _index: number,
+        outPath: string
+      ) => ({
+        filePath: outPath,
+        byteLength: 256,
+        rows: 16,
+        columns: 16,
+        bitsAllocated: 8,
+        pixelRepresentation: 0,
+        pixelSpacingRow: 1,
+        pixelSpacingCol: 1,
+      }),
+      releaseVolume: (_handle: number) => undefined,
+      writeSyntheticVolumeSeries: (
+        outDir: string,
+        n: number,
+        _spacing: number
+      ) => {
+        const arr: string[] = [];
+        for (let i = 0; i < n; i++) {
+          arr.push(`${outDir}/vnd-vol-${String(i).padStart(3, '0')}.dcm`);
+        }
+        return JSON.stringify(arr);
+      },
       readDicom: (path: string) => {
         const uidMatch = path.match(/vnd-synthetic-([0-9.]+|default)/);
         const uid = uidMatch?.[1];

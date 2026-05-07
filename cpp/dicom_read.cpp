@@ -576,6 +576,114 @@ std::string readBinaryFileAsLatin1(const std::string& path,
   return out;
 }
 
+// ---- Phase 5.1: synthetic volume series -----------------------------------
+
+std::vector<std::string> writeSyntheticVolumeSeries(const std::string& outDir,
+                                                    int numberOfSlices,
+                                                    double sliceSpacingMm) {
+  if (numberOfSlices < 1) numberOfSlices = 1;
+  if (sliceSpacingMm <= 0) sliceSpacingMm = 1.0;
+
+  // 16x16 monochrome 8-bit. Each slice gets a per-slice intensity offset so
+  // the volume isn't constant along Z (sagittal/coronal reformats need
+  // gradient).
+  const int kRows = 16;
+  const int kCols = 16;
+  const int kBytes = kRows * kCols;
+
+  // One Study + one Series shared across slices; one SOP Instance UID per
+  // slice. UID generator is stateful — share across the loop.
+  gdcm::UIDGenerator uid;
+  const std::string studyUID = uid.Generate();
+  const std::string seriesUID = uid.Generate();
+
+  std::vector<std::string> paths;
+  paths.reserve(numberOfSlices);
+
+  for (int si = 0; si < numberOfSlices; ++si) {
+    char nameBuf[32];
+    std::snprintf(nameBuf, sizeof(nameBuf), "vnd-vol-%03d.dcm", si);
+    std::string slicePath = outDir + "/" + nameBuf;
+
+    std::vector<unsigned char> pixels(kBytes);
+    for (int r = 0; r < kRows; ++r) {
+      for (int c = 0; c < kCols; ++c) {
+        pixels[r * kCols + c] =
+            static_cast<unsigned char>((r + c + si * 8) & 0xFF);
+      }
+    }
+
+    gdcm::Image img;
+    img.SetNumberOfDimensions(2);
+    img.SetDimension(0, kCols);
+    img.SetDimension(1, kRows);
+    img.SetPhotometricInterpretation(
+        gdcm::PhotometricInterpretation::MONOCHROME2);
+    img.GetPixelFormat().SetSamplesPerPixel(1);
+    img.SetPixelFormat(gdcm::PixelFormat::UINT8);
+    img.SetTransferSyntax(gdcm::TransferSyntax::ImplicitVRLittleEndian);
+
+    gdcm::DataElement pixelData(gdcm::Tag(0x7FE0, 0x0010));
+    pixelData.SetByteValue(reinterpret_cast<const char*>(pixels.data()),
+                           static_cast<uint32_t>(pixels.size()));
+    img.SetDataElement(pixelData);
+
+    gdcm::ImageWriter writer;
+    writer.SetFileName(slicePath.c_str());
+    writer.SetImage(img);
+
+    gdcm::DataSet& ds = writer.GetFile().GetDataSet();
+    auto setUI = [&](uint16_t g, uint16_t e, const char* value) {
+      gdcm::DataElement de(gdcm::Tag(g, e));
+      de.SetVR(gdcm::VR::UI);
+      de.SetByteValue(value, static_cast<uint32_t>(std::strlen(value)));
+      ds.Replace(de);
+    };
+    auto setText = [&](uint16_t g, uint16_t e, gdcm::VR vr,
+                       const std::string& value) {
+      gdcm::DataElement de(gdcm::Tag(g, e));
+      de.SetVR(vr);
+      de.SetByteValue(value.c_str(), static_cast<uint32_t>(value.size()));
+      ds.Replace(de);
+    };
+
+    setUI(0x0008, 0x0016, "1.2.840.10008.5.1.4.1.1.4");  // MR Image Storage
+    // gdcm::UIDGenerator::Generate() returns a const char* into a member
+    // string that's invalidated on the next call — copy immediately.
+    const std::string sopInstanceUID = uid.Generate();
+    setUI(0x0008, 0x0018, sopInstanceUID.c_str());
+    setUI(0x0020, 0x000D, studyUID.c_str());              // Study UID
+    setUI(0x0020, 0x000E, seriesUID.c_str());             // Series UID
+    setText(0x0008, 0x0060, gdcm::VR::CS, "MR");
+    setText(0x0010, 0x0010, gdcm::VR::PN, "VibeNativeDicom^Volume");
+    setText(0x0010, 0x0020, gdcm::VR::LO, "VND-VOL-001");
+    setText(0x0008, 0x0020, gdcm::VR::DA, "20260101");
+    setText(0x0008, 0x0030, gdcm::VR::TM, "120000");
+    setText(0x0008, 0x0050, gdcm::VR::SH, "VND-VOL");
+    setText(0x0010, 0x0030, gdcm::VR::DA, "20000101");
+    setText(0x0010, 0x0040, gdcm::VR::CS, "O");
+    setText(0x0020, 0x0010, gdcm::VR::SH, "1");
+    setText(0x0020, 0x0011, gdcm::VR::IS, "1");
+    char inBuf[16];
+    std::snprintf(inBuf, sizeof(inBuf), "%d", si + 1);
+    setText(0x0020, 0x0013, gdcm::VR::IS, inBuf);
+    setText(0x0028, 0x0030, gdcm::VR::DS, "1.0\\1.0");
+
+    // ImagePositionPatient (0020,0032) — z increments by sliceSpacingMm.
+    char ippBuf[64];
+    std::snprintf(ippBuf, sizeof(ippBuf), "0\\0\\%g", si * sliceSpacingMm);
+    setText(0x0020, 0x0032, gdcm::VR::DS, ippBuf);
+
+    if (!writer.Write()) {
+      throw std::runtime_error(
+          std::string("writeSyntheticVolumeSeries: failed to write ") +
+          slicePath);
+    }
+    paths.push_back(slicePath);
+  }
+  return paths;
+}
+
 // ---- Phase 4.2: Basic Text SR writer --------------------------------------
 
 namespace {

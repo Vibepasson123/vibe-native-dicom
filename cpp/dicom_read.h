@@ -134,6 +134,19 @@ void writeSyntheticDicomFile(const std::string& path,
                              const std::string& transferSyntaxUID = "",
                              int numberOfFrames = 1);
 
+// Phase 5.1 — write a synthetic volume series for MPR demos. Produces N
+// single-frame Implicit-VR-LE DICOM files at `outDir/vnd-vol-<NNN>.dcm`
+// that share Study/Series UIDs and increment ImagePositionPatient.z by
+// `sliceSpacing` mm. Returns the list of paths in series order.
+//
+// Each slice's pixel buffer is a 16x16 monochrome 8-bit gradient with a
+// per-slice offset (pixel value = (row+col+sliceIndex*8) % 256), so
+// scrolling through axial slices shows visible motion and sagittal /
+// coronal reformats produce non-trivial textures.
+std::vector<std::string> writeSyntheticVolumeSeries(const std::string& outDir,
+                                                    int numberOfSlices,
+                                                    double sliceSpacingMm);
+
 // Result of extractPixelDataToFile — what the JS layer actually needs to
 // know about the raw pixel buffer (everything except the bytes themselves,
 // which live at outPath).

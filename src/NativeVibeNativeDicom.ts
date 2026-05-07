@@ -75,6 +75,36 @@ export interface Spec extends TurboModule {
     sourceSopInstanceUID: string,
     sourceSopClassUID: string
   ): string;
+
+  // Phase 5.1 — build a 3D volume from a series of co-aligned DICOM
+  // slice paths (JSON-encoded array of strings; codegen avoids
+  // string[] for the same reason as above). Returns an UnsafeObject
+  // with the VolumeInfo shape including a numeric `handle` callers
+  // pass to extractMprSlice / releaseVolume.
+  buildVolumeFromDicoms(dicomPathsJson: string): Object;
+
+  // Phase 5.1 — write a synthetic volume series for MPR demos. Returns
+  // a JSON-encoded array of slice paths in series order.
+  writeSyntheticVolumeSeries(
+    outDir: string,
+    numberOfSlices: number,
+    sliceSpacingMm: number
+  ): string;
+
+  // Phase 5.1 — extract a single MPR slice (axial=0 / sagittal=1 /
+  // coronal=2) from volume `handle` to `outPath`. Returns an
+  // UnsafeObject with the MprSliceInfo shape (file path + geometry
+  // + per-slice pixel spacing).
+  extractMprSlice(
+    handle: number,
+    plane: number,
+    index: number,
+    outPath: string
+  ): Object;
+
+  // Phase 5.1 — drop the volume buffer for `handle`. Safe to call with
+  // an unknown handle (no-op).
+  releaseVolume(handle: number): void;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('VibeNativeDicom');
