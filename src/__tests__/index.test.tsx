@@ -158,6 +158,20 @@ jest.mock('../NativeVibeNativeDicom', () => {
         pixelSpacingCol: 1,
       }),
       releaseVolume: (_handle: number) => undefined,
+      extractObliqueSlice: (
+        _handle: number,
+        _specJson: string,
+        outPath: string
+      ) => ({
+        filePath: outPath,
+        byteLength: 256,
+        rows: 16,
+        columns: 16,
+        bitsAllocated: 8,
+        pixelRepresentation: 0,
+        pixelSpacingRow: 1,
+        pixelSpacingCol: 1,
+      }),
       writeSyntheticVolumeSeries: (
         outDir: string,
         n: number,

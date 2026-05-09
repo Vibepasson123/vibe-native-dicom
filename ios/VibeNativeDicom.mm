@@ -112,6 +112,24 @@
   [VibeNativeDicomImpl releaseVolume:@(handle)];
 }
 
+- (id)extractObliqueSlice:(double)handle
+                 specJson:(NSString *)specJson
+                  outPath:(NSString *)outPath {
+  NSError *error = nil;
+  NSDictionary *result = [VibeNativeDicomImpl
+      extractObliqueSlice:@(handle)
+                  specJson:specJson
+                   outPath:outPath
+                     error:&error];
+  if (result == nil) {
+    @throw [NSException
+        exceptionWithName:@"VibeNativeDicomError"
+                   reason:error.localizedDescription ?: @"extractObliqueSlice failed"
+                 userInfo:nil];
+  }
+  return result;
+}
+
 - (NSString *)writeSyntheticVolumeSeries:(NSString *)outDir
                           numberOfSlices:(double)n
                           sliceSpacingMm:(double)spacing

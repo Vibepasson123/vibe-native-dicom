@@ -94,6 +94,18 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
     nativeReleaseVolume(handle)
   }
 
+  override fun extractObliqueSlice(
+    handle: Double,
+    specJson: String,
+    outPath: String
+  ): WritableMap {
+    @Suppress("UNCHECKED_CAST")
+    val raw =
+      nativeExtractObliqueSlice(handle, specJson, outPath)
+        as java.util.HashMap<String, Any?>
+    return Arguments.makeNativeMap(raw)
+  }
+
   override fun writeSyntheticVolumeSeries(
     outDir: String,
     numberOfSlices: Double,
@@ -168,6 +180,11 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
     outPath: String
   ): Any
   private external fun nativeReleaseVolume(handle: Double)
+  private external fun nativeExtractObliqueSlice(
+    handle: Double,
+    specJson: String,
+    outPath: String
+  ): Any
   private external fun nativeWriteSyntheticVolumeSeries(
     outDir: String,
     numberOfSlices: Int,

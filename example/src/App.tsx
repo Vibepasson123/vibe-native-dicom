@@ -49,6 +49,9 @@ import {
   type VolumeInfo,
   type MprSliceInfo,
   type MprPlane,
+  // Phase 5.3 — oblique
+  extractObliqueSlice,
+  useObliqueController,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -185,6 +188,10 @@ function App() {
   );
   const [gappedVolume, setGappedVolume] = useState<VolumeInfo | null>(null);
   const [phase52Err, setPhase52Err] = useState<string | null>(null);
+  // Phase 5.3 — oblique slicing on the same volume.
+  const oblique = useObliqueController(volume);
+  const [obliqueSlice, setObliqueSlice] = useState<MprSliceInfo | null>(null);
+  const [obliqueErr, setObliqueErr] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -436,6 +443,22 @@ function App() {
       if (gappedVolume) releaseVolume(gappedVolume.handle);
     };
   }, [gappedVolume]);
+
+  // Phase 5.3 — re-extract the oblique slice when rotation or volume
+  // changes. Slow path: trilinear sampling at 100s of thousands of
+  // points. Cheap enough at 16x16x16 to run on every slider tick.
+  useEffect(() => {
+    if (!volume || !oblique.spec) return;
+    try {
+      const out = `/tmp/vnd-oblique-${volume.handle}-${oblique.rotX.toFixed(
+        3
+      )}-${oblique.rotY.toFixed(3)}-${oblique.rotZ.toFixed(3)}.bin`;
+      setObliqueSlice(extractObliqueSlice(volume.handle, oblique.spec, out));
+      setObliqueErr(null);
+    } catch (err) {
+      setObliqueErr((err as Error).message);
+    }
+  }, [volume, oblique.spec, oblique.rotX, oblique.rotY, oblique.rotZ]);
 
   const overallPass =
     parityPass === true &&
@@ -950,6 +973,82 @@ function App() {
               </View>
             );
           })}
+        </View>
+      )}
+
+      <Text style={styles.section}>Oblique reformat (Phase 5.3)</Text>
+      {obliqueErr && <Text style={styles.fail}>FAIL · {obliqueErr}</Text>}
+      {!volume && !obliqueErr && <ActivityIndicator />}
+      {volume && oblique.spec && (
+        <View style={styles.block}>
+          <Text style={styles.label}>
+            Trilinear-sampled plane through volume centre · output{' '}
+            {oblique.spec.columns}×{oblique.spec.rows} @{' '}
+            {oblique.spec.pixelSpacingMm.toFixed(2)} mm/px
+          </Text>
+          <View style={styles.viewerWrapper}>
+            {obliqueSlice && (
+              <DicomImageViewSkia
+                filePath={obliqueSlice.filePath}
+                rows={obliqueSlice.rows}
+                columns={obliqueSlice.columns}
+                bitsAllocated={obliqueSlice.bitsAllocated}
+                photometricInterpretation={volume.photometricInterpretation}
+                windowCenter={128}
+                windowWidth={256}
+                width={192}
+                height={192}
+                enableGestures={false}
+              />
+            )}
+          </View>
+          <Text style={styles.label}>rotX · rotY · rotZ (deg)</Text>
+          <Text style={styles.value}>
+            {((oblique.rotX * 180) / Math.PI).toFixed(0)}° ·{' '}
+            {((oblique.rotY * 180) / Math.PI).toFixed(0)}° ·{' '}
+            {((oblique.rotZ * 180) / Math.PI).toFixed(0)}°
+          </Text>
+          <View style={styles.sliderRow}>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => oblique.setRotX(oblique.rotX - Math.PI / 12)}
+            >
+              X−
+            </Text>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => oblique.setRotX(oblique.rotX + Math.PI / 12)}
+            >
+              X+
+            </Text>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => oblique.setRotY(oblique.rotY - Math.PI / 12)}
+            >
+              Y−
+            </Text>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => oblique.setRotY(oblique.rotY + Math.PI / 12)}
+            >
+              Y+
+            </Text>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => oblique.setRotZ(oblique.rotZ - Math.PI / 12)}
+            >
+              Z−
+            </Text>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => oblique.setRotZ(oblique.rotZ + Math.PI / 12)}
+            >
+              Z+
+            </Text>
+          </View>
+          <Text style={styles.sliderButton} onPress={oblique.reset}>
+            Reset
+          </Text>
         </View>
       )}
 

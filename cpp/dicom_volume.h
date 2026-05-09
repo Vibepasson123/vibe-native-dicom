@@ -123,4 +123,41 @@ struct MprSliceInfo {
 MprSliceInfo extractSlice(long long handle, MprPlane plane, int index,
                           const std::string& outPath);
 
+// Phase 5.3 — oblique plane spec.
+//
+// An oblique plane is defined by a center point (in mm, image-patient
+// coords with the volume's lower-left-near corner at 0,0,0) plus two
+// orthonormal in-plane basis vectors u (output column axis) and v
+// (output row axis). The plane normal is u × v; we don't take it as
+// an explicit input because the basis already encodes orientation.
+//
+// Output dimensions and per-output-pixel spacing are the caller's
+// choice. Reasonable defaults:
+//   pixelSpacingMm = min(volume.pixelSpacingRow,
+//                        volume.pixelSpacingCol,
+//                        volume.sliceSpacing)
+//   columns / rows  = ceil(volume diagonal / pixelSpacingMm) so the
+//   whole volume fits regardless of orientation. Caller picks for the
+//   target use case.
+//
+// The sampling is trilinear in volume voxel space. Out-of-volume
+// samples render as 0 (black) — the caller can detect by extracting
+// at a known-edge oblique and observing the dark wedges.
+struct ObliqueSpec {
+  double centerMm[3] = {0, 0, 0};
+  double uMm[3] = {1, 0, 0};
+  double vMm[3] = {0, 1, 0};
+  int columns = 0;
+  int rows = 0;
+  double pixelSpacingMm = 1.0;
+};
+
+// Phase 5.3 — extract an oblique slice. Output dimensions are the
+// caller's choice; pixel spacing is uniform over the output. Result
+// shape is identical to extractSlice (raw pixel buffer at outPath +
+// MprSliceInfo) so the existing Skia viewer pipeline renders it
+// directly.
+MprSliceInfo extractObliqueSlice(long long handle, const ObliqueSpec& spec,
+                                 const std::string& outPath);
+
 }  // namespace vnd

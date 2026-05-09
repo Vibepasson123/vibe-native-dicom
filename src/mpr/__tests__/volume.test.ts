@@ -42,6 +42,23 @@ jest.mock('../../NativeVibeNativeDicom', () => ({
       _index: index, // marker for assertion
     }),
     releaseVolume: () => undefined,
+    extractObliqueSlice: (
+      _handle: number,
+      specJson: string,
+      outPath: string
+    ) => {
+      const spec = JSON.parse(specJson);
+      return {
+        filePath: outPath,
+        byteLength: spec.rows * spec.columns,
+        rows: spec.rows,
+        columns: spec.columns,
+        bitsAllocated: 8,
+        pixelRepresentation: 0,
+        pixelSpacingRow: spec.pixelSpacingMm,
+        pixelSpacingCol: spec.pixelSpacingMm,
+      };
+    },
     writeSyntheticVolumeSeries: (
       outDir: string,
       n: number,
@@ -61,6 +78,7 @@ jest.mock('../../NativeVibeNativeDicom', () => ({
 import {
   buildVolumeFromDicoms,
   extractMprSlice,
+  extractObliqueSlice,
   releaseVolume,
   writeSyntheticVolumeSeries,
 } from '../volume.native';
@@ -85,6 +103,26 @@ describe('Phase 5.1 — volume / MPR bridge', () => {
     expect((v1 as unknown as { _resampleArg: boolean })._resampleArg).toBe(
       true
     );
+  });
+
+  it('extractObliqueSlice serialises ObliqueSpec to JSON for the bridge', () => {
+    const slice = extractObliqueSlice(
+      42,
+      {
+        centerMm: [10, 20, 30],
+        uMm: [1, 0, 0],
+        vMm: [0, 1, 0],
+        columns: 64,
+        rows: 64,
+        pixelSpacingMm: 0.5,
+      },
+      '/tmp/oblique.bin'
+    );
+    expect(slice.filePath).toBe('/tmp/oblique.bin');
+    expect(slice.rows).toBe(64);
+    expect(slice.columns).toBe(64);
+    expect(slice.pixelSpacingRow).toBe(0.5);
+    expect(slice.pixelSpacingCol).toBe(0.5);
   });
 
   it('writeSyntheticVolumeSeries accepts Phase 5.2 options', () => {

@@ -99,6 +99,19 @@ import Foundation
     GdcmBridge.releaseVolume(withHandle: handle.doubleValue)
   }
 
+  @objc public static func extractObliqueSlice(
+    _ handle: NSNumber,
+    specJson: NSString,
+    outPath: NSString
+  ) throws -> NSDictionary {
+    let dict = try GdcmBridge.extractObliqueSlice(
+      fromHandle: handle.doubleValue,
+      specJson: specJson as String,
+      toPath: outPath as String
+    )
+    return dict as NSDictionary
+  }
+
   @objc public static func writeSyntheticVolumeSeries(
     _ outDir: NSString,
     numberOfSlices: NSNumber,

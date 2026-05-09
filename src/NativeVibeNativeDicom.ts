@@ -118,6 +118,15 @@ export interface Spec extends TurboModule {
   // Phase 5.1 — drop the volume buffer for `handle`. Safe to call with
   // an unknown handle (no-op).
   releaseVolume(handle: number): void;
+
+  // Phase 5.3 — extract an oblique slice by trilinear sampling.
+  // `specJson` is a JSON-encoded ObliqueSpec object — codegen avoids
+  // nested-object parameters so we serialise on the JS side.
+  extractObliqueSlice(
+    handle: number,
+    specJson: string,
+    outPath: string
+  ): Object;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('VibeNativeDicom');

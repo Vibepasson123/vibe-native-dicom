@@ -582,4 +582,155 @@ MprSliceInfo extractSlice(long long handle, MprPlane plane, int index,
   throw std::runtime_error("extractSlice: unknown plane");
 }
 
+// ---- Phase 5.3: oblique slicing -------------------------------------------
+
+namespace {
+
+// Trilinear sampler at fractional voxel coords (vx, vy, vz). Returns the
+// sampled stored value as a double; caller writes back as 8-bit / 16-bit.
+// Out-of-bounds samples return 0 (deliberate — see ObliqueSpec docs).
+double trilinearSample(const InternalVolume& v, double vx, double vy,
+                       double vz) {
+  if (vx < 0 || vy < 0 || vz < 0) return 0;
+  if (vx > v.columns - 1 || vy > v.rows - 1 || vz > v.depth - 1) return 0;
+  const int x0 = static_cast<int>(std::floor(vx));
+  const int y0 = static_cast<int>(std::floor(vy));
+  const int z0 = static_cast<int>(std::floor(vz));
+  const int x1 = std::min(v.columns - 1, x0 + 1);
+  const int y1 = std::min(v.rows - 1, y0 + 1);
+  const int z1 = std::min(v.depth - 1, z0 + 1);
+  const double tx = vx - x0;
+  const double ty = vy - y0;
+  const double tz = vz - z0;
+  const int bpp = v.bytesPerPixel;
+  const size_t rowStride = static_cast<size_t>(v.columns) * bpp;
+  const size_t sliceStride = rowStride * v.rows;
+  const bool signed16 =
+      (v.bitsAllocated == 16) && (v.pixelRepresentation == 1);
+
+  // Read one stored sample.
+  auto get = [&](int x, int y, int z) -> double {
+    const unsigned char* p =
+        v.buffer.data() + z * sliceStride + y * rowStride + x * bpp;
+    if (bpp == 1) return p[0];
+    int raw = p[0] | (p[1] << 8);
+    if (signed16 && raw > 32767) raw -= 65536;
+    return raw;
+  };
+
+  const double c000 = get(x0, y0, z0);
+  const double c100 = get(x1, y0, z0);
+  const double c010 = get(x0, y1, z0);
+  const double c110 = get(x1, y1, z0);
+  const double c001 = get(x0, y0, z1);
+  const double c101 = get(x1, y0, z1);
+  const double c011 = get(x0, y1, z1);
+  const double c111 = get(x1, y1, z1);
+  const double c00 = c000 * (1 - tx) + c100 * tx;
+  const double c01 = c001 * (1 - tx) + c101 * tx;
+  const double c10 = c010 * (1 - tx) + c110 * tx;
+  const double c11 = c011 * (1 - tx) + c111 * tx;
+  const double c0 = c00 * (1 - ty) + c10 * ty;
+  const double c1 = c01 * (1 - ty) + c11 * ty;
+  return c0 * (1 - tz) + c1 * tz;
+}
+
+}  // namespace
+
+MprSliceInfo extractObliqueSlice(long long handle, const ObliqueSpec& spec,
+                                 const std::string& outPath) {
+  std::lock_guard<std::mutex> lock(registryMutex());
+  auto it = registry().find(handle);
+  if (it == registry().end()) {
+    throw std::runtime_error("extractObliqueSlice: invalid volume handle");
+  }
+  const InternalVolume& v = it->second;
+  if (spec.columns <= 0 || spec.rows <= 0) {
+    throw std::runtime_error(
+        "extractObliqueSlice: columns and rows must be > 0");
+  }
+  if (spec.pixelSpacingMm <= 0) {
+    throw std::runtime_error(
+        "extractObliqueSlice: pixelSpacingMm must be > 0");
+  }
+  const int bpp = v.bytesPerPixel;
+  const bool signed16 =
+      (v.bitsAllocated == 16) && (v.pixelRepresentation == 1);
+
+  // Volume voxel spacing in mm. Origin at voxel (0,0,0), corner at
+  // ((columns-1)*colSpacing, (rows-1)*rowSpacing, (depth-1)*sliceSpacing).
+  const double sx = v.pixelSpacingCol;
+  const double sy = v.pixelSpacingRow;
+  const double sz = v.sliceSpacing;
+
+  const size_t outBytes =
+      static_cast<size_t>(spec.rows) * spec.columns * bpp;
+  std::vector<unsigned char> out(outBytes, 0);
+
+  const double halfW = (spec.columns - 1) / 2.0;
+  const double halfH = (spec.rows - 1) / 2.0;
+
+  for (int j = 0; j < spec.rows; ++j) {
+    for (int i = 0; i < spec.columns; ++i) {
+      const double du = (i - halfW) * spec.pixelSpacingMm;
+      const double dv = (j - halfH) * spec.pixelSpacingMm;
+      // World point in mm.
+      const double wx =
+          spec.centerMm[0] + du * spec.uMm[0] + dv * spec.vMm[0];
+      const double wy =
+          spec.centerMm[1] + du * spec.uMm[1] + dv * spec.vMm[1];
+      const double wz =
+          spec.centerMm[2] + du * spec.uMm[2] + dv * spec.vMm[2];
+      // To voxel coords.
+      const double vx = wx / sx;
+      const double vy = wy / sy;
+      const double vz = wz / sz;
+      const double sampled = trilinearSample(v, vx, vy, vz);
+
+      unsigned char* dst = out.data() + (j * spec.columns + i) * bpp;
+      if (bpp == 1) {
+        const int rounded =
+            static_cast<int>(std::round(sampled));
+        const int clamped = std::min(255, std::max(0, rounded));
+        dst[0] = static_cast<unsigned char>(clamped);
+      } else {
+        int rounded = static_cast<int>(std::round(sampled));
+        if (signed16) {
+          if (rounded < -32768) rounded = -32768;
+          else if (rounded > 32767) rounded = 32767;
+          if (rounded < 0) rounded += 65536;
+        } else {
+          if (rounded < 0) rounded = 0;
+          else if (rounded > 65535) rounded = 65535;
+        }
+        dst[0] = static_cast<unsigned char>(rounded & 0xFF);
+        dst[1] = static_cast<unsigned char>((rounded >> 8) & 0xFF);
+      }
+    }
+  }
+
+  std::FILE* fp = std::fopen(outPath.c_str(), "wb");
+  if (!fp) {
+    throw std::runtime_error(
+        std::string("extractObliqueSlice: cannot open ") + outPath);
+  }
+  const size_t written = std::fwrite(out.data(), 1, out.size(), fp);
+  std::fclose(fp);
+  if (written != out.size()) {
+    throw std::runtime_error(
+        std::string("extractObliqueSlice: short write to ") + outPath);
+  }
+
+  MprSliceInfo info;
+  info.filePath = outPath;
+  info.byteLength = static_cast<long long>(out.size());
+  info.rows = spec.rows;
+  info.columns = spec.columns;
+  info.bitsAllocated = v.bitsAllocated;
+  info.pixelRepresentation = v.pixelRepresentation;
+  info.pixelSpacingRow = spec.pixelSpacingMm;
+  info.pixelSpacingCol = spec.pixelSpacingMm;
+  return info;
+}
+
 }  // namespace vnd

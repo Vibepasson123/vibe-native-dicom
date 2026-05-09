@@ -20,6 +20,37 @@ export type BuildVolumeOptions = {
   resampleNonUniformZ?: boolean;
 };
 
+/**
+ * Phase 5.3 — oblique slice plane spec.
+ *
+ * The plane is defined by a center point in volume mm-coords + two
+ * orthonormal in-plane basis vectors. The volume's lower-left-near
+ * corner is at (0,0,0); the far corner at
+ * ((columns-1)*pixelSpacingCol, (rows-1)*pixelSpacingRow,
+ *  (depth-1)*sliceSpacing).
+ *
+ * `u` is the output column axis (X in the output), `v` is the output
+ * row axis (Y). They MUST be unit-length and mutually orthogonal —
+ * non-orthonormal bases produce a sheared output without warning.
+ *
+ * Output dimensions and `pixelSpacingMm` are caller-chosen. A common
+ * pattern: pixelSpacingMm = min of the volume's three axis spacings;
+ * columns = rows = ceil(volume diagonal / pixelSpacingMm) so the
+ * whole volume fits regardless of plane orientation.
+ */
+export type ObliqueSpec = {
+  /** Center of the output slice in volume mm-coords. */
+  centerMm: [number, number, number];
+  /** Output column axis (unit vector in volume mm-coords). */
+  uMm: [number, number, number];
+  /** Output row axis (unit vector in volume mm-coords). */
+  vMm: [number, number, number];
+  columns: number;
+  rows: number;
+  /** Output pixel size in mm (uniform). */
+  pixelSpacingMm: number;
+};
+
 export type VolumeInfo = {
   /** Stable handle returned by `buildVolumeFromDicoms`. Pass to slice
    *  extractors and to `releaseVolume`. */

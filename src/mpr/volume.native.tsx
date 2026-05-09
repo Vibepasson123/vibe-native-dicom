@@ -3,6 +3,7 @@ import type {
   BuildVolumeOptions,
   MprPlane,
   MprSliceInfo,
+  ObliqueSpec,
   VolumeInfo,
 } from './types';
 
@@ -38,6 +39,18 @@ export function extractMprSlice(
 
 export function releaseVolume(handle: number): void {
   VibeNativeDicom.releaseVolume(handle);
+}
+
+export function extractObliqueSlice(
+  handle: number,
+  spec: ObliqueSpec,
+  outPath: string
+): MprSliceInfo {
+  return VibeNativeDicom.extractObliqueSlice(
+    handle,
+    JSON.stringify(spec),
+    outPath
+  ) as MprSliceInfo;
 }
 
 export type SyntheticVolumeSeriesOptions = {

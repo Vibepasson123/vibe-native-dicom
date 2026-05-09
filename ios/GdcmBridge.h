@@ -87,6 +87,14 @@ NS_ASSUME_NONNULL_BEGIN
 // Phase 5.1 — drop the volume buffer for `handle`.
 + (void)releaseVolumeWithHandle:(double)handle;
 
+// Phase 5.3 — extract an oblique slice. `specJson` is a JSON-encoded
+// ObliqueSpec object (see types.ts). Returns an NSDictionary with the
+// MprSliceInfo shape.
++ (nullable NSDictionary *)extractObliqueSliceFromHandle:(double)handle
+                                                 specJson:(NSString *)specJson
+                                                   toPath:(NSString *)outPath
+                                                    error:(NSError **)error;
+
 // Phase 5.1 — write a synthetic volume series; returns a JSON-encoded
 // array of slice paths. Phase 5.2 options: transferSyntaxUID + gappedZ.
 + (nullable NSString *)writeSyntheticVolumeSeriesAtDir:(NSString *)outDir

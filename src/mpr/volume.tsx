@@ -4,6 +4,7 @@ import type {
   BuildVolumeOptions,
   MprPlane,
   MprSliceInfo,
+  ObliqueSpec,
   VolumeInfo,
 } from './types';
 
@@ -28,6 +29,16 @@ export function extractMprSlice(
 }
 
 export function releaseVolume(_handle: number): void {
+  throw new Error(
+    "'@viveksah/vibe-native-dicom' is only supported on native platforms."
+  );
+}
+
+export function extractObliqueSlice(
+  _handle: number,
+  _spec: ObliqueSpec,
+  _outPath: string
+): MprSliceInfo {
   throw new Error(
     "'@viveksah/vibe-native-dicom' is only supported on native platforms."
   );
