@@ -51,21 +51,42 @@ struct VolumeInfo {
 };
 
 /**
+ * Phase 5.2 — build options. All fields are optional with sensible
+ * defaults; pass a default-constructed BuildVolumeOptions for the
+ * Phase 5.1 behaviour.
+ */
+struct BuildVolumeOptions {
+  /**
+   * When the input series has non-uniform z-spacing (max-deviation >
+   * 5% of mean Δz), should we resample to a uniform grid?
+   *   false (Phase 5.1 default) — throw std::runtime_error.
+   *   true — trilinear-along-Z resample to a uniform grid at the
+   *   median Δz; the slice count is rounded to fit the original z
+   *   extent. X/Y are left unchanged.
+   */
+  bool resampleNonUniformZ = false;
+};
+
+/**
  * Build a volume from `dicomPaths`. Slices are sorted by
  * ImagePositionPatient.z (DICOM PS3.3 C.7.6.2.1.2) so the volume is
  * built in anatomical order regardless of file naming. Validates:
  *   - all slices have the same Rows/Columns/BitsAllocated/SamplesPerPixel
- *   - all slices use one of the supported uncompressed transfer syntaxes
- *     (Phase 5.1 limit; compressed series will be supported once the
- *     decode path is exercised on stacks)
- *   - z spacing is approximately uniform (variance < 1% of mean)
- * On any failure throws std::runtime_error with a specific message.
+ *   - z spacing is approximately uniform (≤5% deviation), OR
+ *     opts.resampleNonUniformZ is true (Phase 5.2: trilinear-along-Z
+ *     resample to a uniform grid at the median Δz)
+ *
+ * Compressed transfer syntaxes (JPEG, JPEG-LS, JPEG 2000, RLE, ...) are
+ * supported transparently — gdcm::ImageReader auto-decompresses each
+ * slice via the Phase 2.2 decoder pipeline. The volume buffer always
+ * holds raw uncompressed pixels.
  *
  * Returned VolumeInfo carries the registry handle. Callers free with
  * releaseVolume(handle) — failing to do so leaks the buffer until the
  * process exits.
  */
-VolumeInfo buildVolumeFromDicoms(const std::vector<std::string>& dicomPaths);
+VolumeInfo buildVolumeFromDicoms(const std::vector<std::string>& dicomPaths,
+                                 const BuildVolumeOptions& opts = {});
 
 /**
  * Drop the volume + buffer for `handle`. Safe to call with an invalid

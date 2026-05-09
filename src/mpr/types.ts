@@ -8,6 +8,18 @@
 
 export type MprPlane = 'axial' | 'sagittal' | 'coronal';
 
+/**
+ * Phase 5.2 — options for buildVolumeFromDicoms.
+ */
+export type BuildVolumeOptions = {
+  /**
+   * Trilinear-along-Z resample to a uniform grid when the input series
+   * has >5% Δz deviation. Default false: non-uniform input throws (Phase
+   * 5.1 behaviour).
+   */
+  resampleNonUniformZ?: boolean;
+};
+
 export type VolumeInfo = {
   /** Stable handle returned by `buildVolumeFromDicoms`. Pass to slice
    *  extractors and to `releaseVolume`. */

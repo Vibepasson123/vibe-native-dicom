@@ -72,11 +72,13 @@
   return result;
 }
 
-- (id)buildVolumeFromDicoms:(NSString *)dicomPathsJson {
+- (id)buildVolumeFromDicoms:(NSString *)dicomPathsJson
+        resampleNonUniformZ:(BOOL)resampleNonUniformZ {
   NSError *error = nil;
-  NSDictionary *result =
-      [VibeNativeDicomImpl buildVolumeFromDicoms:dicomPathsJson
-                                            error:&error];
+  NSDictionary *result = [VibeNativeDicomImpl
+      buildVolumeFromDicoms:dicomPathsJson
+        resampleNonUniformZ:@(resampleNonUniformZ)
+                      error:&error];
   if (result == nil) {
     @throw [NSException
         exceptionWithName:@"VibeNativeDicomError"
@@ -112,12 +114,16 @@
 
 - (NSString *)writeSyntheticVolumeSeries:(NSString *)outDir
                           numberOfSlices:(double)n
-                          sliceSpacingMm:(double)spacing {
+                          sliceSpacingMm:(double)spacing
+                       transferSyntaxUID:(NSString *)tsUid
+                                 gappedZ:(BOOL)gappedZ {
   NSError *error = nil;
   NSString *result =
       [VibeNativeDicomImpl writeSyntheticVolumeSeries:outDir
                                        numberOfSlices:@(n)
                                        sliceSpacingMm:@(spacing)
+                                    transferSyntaxUID:tsUid
+                                              gappedZ:@(gappedZ)
                                                 error:&error];
   if (result == nil) {
     @throw [NSException

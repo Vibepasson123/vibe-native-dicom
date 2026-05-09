@@ -81,14 +81,27 @@ export interface Spec extends TurboModule {
   // string[] for the same reason as above). Returns an UnsafeObject
   // with the VolumeInfo shape including a numeric `handle` callers
   // pass to extractMprSlice / releaseVolume.
-  buildVolumeFromDicoms(dicomPathsJson: string): Object;
+  // Phase 5.2: `resampleNonUniformZ` enables trilinear-along-Z
+  // resampling when input series has >5% Δz deviation; default false
+  // preserves Phase 5.1 behaviour.
+  buildVolumeFromDicoms(
+    dicomPathsJson: string,
+    resampleNonUniformZ: boolean
+  ): Object;
 
   // Phase 5.1 — write a synthetic volume series for MPR demos. Returns
   // a JSON-encoded array of slice paths in series order.
+  // Phase 5.2 options:
+  //   transferSyntaxUID — empty defaults to Implicit VR LE; otherwise
+  //     re-encodes via gdcm::ImageChangeTransferSyntax.
+  //   gappedZ — when true, alternates Δz between spacing and 2*spacing
+  //     so the resulting series exercises non-uniform-Z resampling.
   writeSyntheticVolumeSeries(
     outDir: string,
     numberOfSlices: number,
-    sliceSpacingMm: number
+    sliceSpacingMm: number,
+    transferSyntaxUID: string,
+    gappedZ: boolean
   ): string;
 
   // Phase 5.1 — extract a single MPR slice (axial=0 / sagittal=1 /

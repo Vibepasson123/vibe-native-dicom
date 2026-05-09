@@ -156,7 +156,125 @@ int readIntAttrDirect(const gdcm::DataSet& ds, uint16_t g, uint16_t e,
 
 }  // namespace
 
-VolumeInfo buildVolumeFromDicoms(const std::vector<std::string>& dicomPaths) {
+namespace {
+
+// Trilinear-along-Z resampler.
+//
+// Inputs are N slices at z positions z[0..N-1] (already sorted) with
+// uniform pixel buffers of size sliceBytes. Output is a uniform grid
+// of M = round((zMax - zMin) / targetSpacing) + 1 slices.
+//
+// For each output slice at z* = zMin + k*targetSpacing:
+//   find the input bracket [z[i], z[i+1]] containing z*,
+//   t = (z* - z[i]) / (z[i+1] - z[i]),
+//   output = (1-t) * src[i] + t * src[i+1] (per-pixel linear blend).
+//
+// Pixels are blended in their stored representation:
+//   - 8-bit unsigned/signed: byte-wise blend (signed wraps but the
+//     window/level shader treats stored values uniformly).
+//   - 16-bit (any signedness): little-endian, signed math when
+//     pixelRepresentation=1; rounded to nearest stored value.
+struct ResampleOut {
+  std::vector<unsigned char> buffer;
+  int outputDepth;
+  double sliceSpacing;
+};
+ResampleOut resampleZTrilinear(
+    const std::vector<std::vector<unsigned char>>& inputSlices,
+    const std::vector<double>& z,
+    int rows,
+    int columns,
+    int bitsAllocated,
+    int pixelRepresentation,
+    double targetSpacing) {
+  const int bpp = (bitsAllocated + 7) / 8;
+  const size_t sliceBytes = static_cast<size_t>(rows) * columns * bpp;
+  const double zMin = z.front();
+  const double zMax = z.back();
+  const double extent = zMax - zMin;
+  // M = floor(extent / targetSpacing) + 1; clamped to at least the
+  // input count so degenerate inputs don't shrink absurdly.
+  int M = static_cast<int>(std::floor(extent / targetSpacing)) + 1;
+  if (M < 2) M = static_cast<int>(inputSlices.size());
+
+  ResampleOut out;
+  out.outputDepth = M;
+  out.sliceSpacing = targetSpacing;
+  out.buffer.assign(sliceBytes * static_cast<size_t>(M), 0);
+
+  const bool signed16 = (bitsAllocated == 16) && (pixelRepresentation == 1);
+
+  for (int k = 0; k < M; ++k) {
+    const double zStar = zMin + k * targetSpacing;
+    // Find bracket [i, i+1] with z[i] <= zStar <= z[i+1]. With sorted
+    // z and zStar in [zMin, zMax] this is a simple linear scan; for
+    // large series binary-search (std::lower_bound) would be faster
+    // but the extra complexity isn't worth it before we hit 1000+
+    // slices.
+    size_t i = 0;
+    while (i + 1 < z.size() && z[i + 1] < zStar) ++i;
+    if (i + 1 >= z.size()) i = z.size() - 2;
+    const double zi = z[i];
+    const double zi1 = z[i + 1];
+    const double dz = zi1 - zi;
+    const double t = (dz > 1e-12) ? (zStar - zi) / dz : 0.0;
+    const double inv = 1.0 - t;
+    const unsigned char* src0 = inputSlices[i].data();
+    const unsigned char* src1 = inputSlices[i + 1].data();
+    unsigned char* dst = out.buffer.data() + k * sliceBytes;
+    if (bpp == 1) {
+      for (size_t p = 0; p < sliceBytes; ++p) {
+        const double v = inv * src0[p] + t * src1[p];
+        dst[p] = static_cast<unsigned char>(
+            std::min(255.0, std::max(0.0, std::round(v))));
+      }
+    } else {
+      // 16-bit, little-endian.
+      const size_t numPx = sliceBytes / 2;
+      for (size_t p = 0; p < numPx; ++p) {
+        int v0 = static_cast<unsigned char>(src0[p * 2]) |
+                 (static_cast<unsigned char>(src0[p * 2 + 1]) << 8);
+        int v1 = static_cast<unsigned char>(src1[p * 2]) |
+                 (static_cast<unsigned char>(src1[p * 2 + 1]) << 8);
+        if (signed16) {
+          if (v0 > 32767) v0 -= 65536;
+          if (v1 > 32767) v1 -= 65536;
+        }
+        const double v = inv * v0 + t * v1;
+        int vi = static_cast<int>(std::round(v));
+        if (signed16) {
+          if (vi < -32768) vi = -32768;
+          else if (vi > 32767) vi = 32767;
+          if (vi < 0) vi += 65536;
+        } else {
+          if (vi < 0) vi = 0;
+          else if (vi > 65535) vi = 65535;
+        }
+        dst[p * 2] = static_cast<unsigned char>(vi & 0xFF);
+        dst[p * 2 + 1] = static_cast<unsigned char>((vi >> 8) & 0xFF);
+      }
+    }
+  }
+  return out;
+}
+
+double medianAbsDelta(const std::vector<double>& zSorted) {
+  std::vector<double> deltas;
+  deltas.reserve(zSorted.size() - 1);
+  for (size_t i = 1; i < zSorted.size(); ++i) {
+    deltas.push_back(std::abs(zSorted[i] - zSorted[i - 1]));
+  }
+  std::sort(deltas.begin(), deltas.end());
+  const size_t n = deltas.size();
+  if (n == 0) return 1.0;
+  if (n % 2 == 1) return deltas[n / 2];
+  return 0.5 * (deltas[n / 2 - 1] + deltas[n / 2]);
+}
+
+}  // namespace
+
+VolumeInfo buildVolumeFromDicoms(const std::vector<std::string>& dicomPaths,
+                                 const BuildVolumeOptions& opts) {
   if (dicomPaths.empty()) {
     throw std::runtime_error("buildVolumeFromDicoms: empty path list");
   }
@@ -247,8 +365,10 @@ VolumeInfo buildVolumeFromDicoms(const std::vector<std::string>& dicomPaths) {
                      return a.position.z < b.position.z;
                    });
 
-  // Slice spacing = mean Δz, with a uniformity check.
+  // Slice spacing analysis. Decide whether the input is already on a
+  // uniform grid or needs Phase 5.2 resampling.
   double sliceSpacing = 1.0;
+  bool needsResample = false;
   if (slices.size() > 1) {
     double sum = 0;
     for (size_t i = 1; i < slices.size(); ++i) {
@@ -260,8 +380,6 @@ VolumeInfo buildVolumeFromDicoms(const std::vector<std::string>& dicomPaths) {
       // blow up downstream. Common for synthetic test data.
       sliceSpacing = 1.0;
     } else {
-      // Variance check: reject series with wildly non-uniform spacing —
-      // those need oblique reformatting (Phase 5.2).
       double maxDeviation = 0;
       for (size_t i = 1; i < slices.size(); ++i) {
         const double d =
@@ -269,9 +387,13 @@ VolumeInfo buildVolumeFromDicoms(const std::vector<std::string>& dicomPaths) {
         maxDeviation = std::max(maxDeviation, std::abs(d - sliceSpacing));
       }
       if (maxDeviation > sliceSpacing * 0.05) {
-        throw std::runtime_error(
-            "buildVolume: non-uniform slice spacing (>5% deviation); use "
-            "oblique reformat path (Phase 5.2)");
+        if (!opts.resampleNonUniformZ) {
+          throw std::runtime_error(
+              "buildVolume: non-uniform slice spacing (>5% deviation); "
+              "set BuildVolumeOptions.resampleNonUniformZ=true to "
+              "trilinear-resample to a uniform grid (Phase 5.2)");
+        }
+        needsResample = true;
       }
     }
   }
@@ -280,28 +402,52 @@ VolumeInfo buildVolumeFromDicoms(const std::vector<std::string>& dicomPaths) {
   InternalVolume v;
   v.rows = s0.rows;
   v.columns = s0.columns;
-  v.depth = static_cast<int>(slices.size());
   v.bitsAllocated = s0.bitsAllocated;
   v.pixelRepresentation = s0.pixelRepresentation;
   v.samplesPerPixel = s0.samplesPerPixel;
   v.bytesPerPixel = (s0.bitsAllocated + 7) / 8;
   v.pixelSpacingRow = s0.pixelSpacingRow;
   v.pixelSpacingCol = s0.pixelSpacingCol;
-  v.sliceSpacing = sliceSpacing;
   v.photometricInterpretation = s0.photometricInterpretation;
 
   const size_t sliceBytes =
       static_cast<size_t>(v.rows) * v.columns * v.bytesPerPixel;
-  v.buffer.resize(sliceBytes * v.depth);
 
+  // Verify per-slice pixel buffer size before any expensive copy/resample.
   for (size_t i = 0; i < slices.size(); ++i) {
-    const auto& src = slices[i].pixels;
-    if (src.size() != sliceBytes) {
+    if (slices[i].pixels.size() != sliceBytes) {
       throw std::runtime_error(
           "buildVolume: slice pixel buffer size mismatch with declared "
           "dimensions");
     }
-    std::memcpy(v.buffer.data() + i * sliceBytes, src.data(), sliceBytes);
+  }
+
+  if (needsResample) {
+    // Build the input arrays for the resampler.
+    std::vector<std::vector<unsigned char>> inputSlices;
+    std::vector<double> zPositions;
+    inputSlices.reserve(slices.size());
+    zPositions.reserve(slices.size());
+    for (auto& s : slices) {
+      inputSlices.push_back(std::move(s.pixels));
+      zPositions.push_back(s.position.z);
+    }
+    const double targetSpacing = medianAbsDelta(zPositions);
+    auto out =
+        resampleZTrilinear(inputSlices, zPositions, v.rows, v.columns,
+                           v.bitsAllocated, v.pixelRepresentation,
+                           targetSpacing);
+    v.buffer = std::move(out.buffer);
+    v.depth = out.outputDepth;
+    v.sliceSpacing = out.sliceSpacing;
+  } else {
+    v.depth = static_cast<int>(slices.size());
+    v.sliceSpacing = sliceSpacing;
+    v.buffer.resize(sliceBytes * v.depth);
+    for (size_t i = 0; i < slices.size(); ++i) {
+      const auto& src = slices[i].pixels;
+      std::memcpy(v.buffer.data() + i * sliceBytes, src.data(), sliceBytes);
+    }
   }
 
   // Register and return.

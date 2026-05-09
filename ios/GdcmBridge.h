@@ -72,7 +72,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 // Phase 5.1 — build a 3D volume from a JSON-encoded array of DICOM file
 // paths. Returns an NSDictionary matching the JS VolumeInfo type.
+// Phase 5.2: `resampleNonUniformZ` enables trilinear-along-Z resample.
 + (nullable NSDictionary *)buildVolumeFromDicomPathsJson:(NSString *)json
+                                     resampleNonUniformZ:(BOOL)resample
                                                    error:(NSError **)error;
 
 // Phase 5.1 — extract one slice. plane: 0=axial, 1=sagittal, 2=coronal.
@@ -86,10 +88,12 @@ NS_ASSUME_NONNULL_BEGIN
 + (void)releaseVolumeWithHandle:(double)handle;
 
 // Phase 5.1 — write a synthetic volume series; returns a JSON-encoded
-// array of slice paths.
+// array of slice paths. Phase 5.2 options: transferSyntaxUID + gappedZ.
 + (nullable NSString *)writeSyntheticVolumeSeriesAtDir:(NSString *)outDir
                                         numberOfSlices:(NSInteger)n
                                         sliceSpacingMm:(double)spacing
+                                     transferSyntaxUID:(NSString *)tsUid
+                                               gappedZ:(BOOL)gappedZ
                                                  error:(NSError **)error;
 
 @end

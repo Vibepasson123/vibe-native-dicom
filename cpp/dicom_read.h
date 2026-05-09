@@ -135,17 +135,28 @@ void writeSyntheticDicomFile(const std::string& path,
                              int numberOfFrames = 1);
 
 // Phase 5.1 — write a synthetic volume series for MPR demos. Produces N
-// single-frame Implicit-VR-LE DICOM files at `outDir/vnd-vol-<NNN>.dcm`
-// that share Study/Series UIDs and increment ImagePositionPatient.z by
-// `sliceSpacing` mm. Returns the list of paths in series order.
+// single-frame DICOM files at `outDir/vnd-vol-<NNN>.dcm` that share
+// Study/Series UIDs and increment ImagePositionPatient.z. Returns the
+// list of paths in series order.
 //
 // Each slice's pixel buffer is a 16x16 monochrome 8-bit gradient with a
 // per-slice offset (pixel value = (row+col+sliceIndex*8) % 256), so
 // scrolling through axial slices shows visible motion and sagittal /
 // coronal reformats produce non-trivial textures.
-std::vector<std::string> writeSyntheticVolumeSeries(const std::string& outDir,
-                                                    int numberOfSlices,
-                                                    double sliceSpacingMm);
+//
+// Phase 5.2 options:
+//   - transferSyntaxUID — empty defaults to Implicit VR LE; otherwise
+//     re-encodes each slice via gdcm::ImageChangeTransferSyntax. Lets
+//     the example app build volumes from compressed series.
+//   - gappedZ — when true, alternates Δz between sliceSpacingMm and
+//     2*sliceSpacingMm so the resulting series exercises the Phase 5.2
+//     non-uniform-Z resample path.
+std::vector<std::string> writeSyntheticVolumeSeries(
+    const std::string& outDir,
+    int numberOfSlices,
+    double sliceSpacingMm,
+    const std::string& transferSyntaxUID = "",
+    bool gappedZ = false);
 
 // Result of extractPixelDataToFile — what the JS layer actually needs to
 // know about the raw pixel buffer (everything except the bytes themselves,

@@ -62,10 +62,14 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
     return nativeReadBinaryFile(path, maxBytes)
   }
 
-  override fun buildVolumeFromDicoms(dicomPathsJson: String): WritableMap {
+  override fun buildVolumeFromDicoms(
+    dicomPathsJson: String,
+    resampleNonUniformZ: Boolean
+  ): WritableMap {
     @Suppress("UNCHECKED_CAST")
     val raw =
-      nativeBuildVolumeFromDicoms(dicomPathsJson) as java.util.HashMap<String, Any?>
+      nativeBuildVolumeFromDicoms(dicomPathsJson, resampleNonUniformZ)
+        as java.util.HashMap<String, Any?>
     return Arguments.makeNativeMap(raw)
   }
 
@@ -93,12 +97,16 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
   override fun writeSyntheticVolumeSeries(
     outDir: String,
     numberOfSlices: Double,
-    sliceSpacingMm: Double
+    sliceSpacingMm: Double,
+    transferSyntaxUID: String,
+    gappedZ: Boolean
   ): String {
     return nativeWriteSyntheticVolumeSeries(
       outDir,
       numberOfSlices.toInt(),
-      sliceSpacingMm
+      sliceSpacingMm,
+      transferSyntaxUID,
+      gappedZ
     )
   }
 
@@ -149,7 +157,10 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
     sourceSopInstanceUID: String,
     sourceSopClassUID: String
   ): String
-  private external fun nativeBuildVolumeFromDicoms(dicomPathsJson: String): Any
+  private external fun nativeBuildVolumeFromDicoms(
+    dicomPathsJson: String,
+    resampleNonUniformZ: Boolean
+  ): Any
   private external fun nativeExtractMprSlice(
     handle: Double,
     plane: Int,
@@ -160,7 +171,9 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
   private external fun nativeWriteSyntheticVolumeSeries(
     outDir: String,
     numberOfSlices: Int,
-    sliceSpacingMm: Double
+    sliceSpacingMm: Double,
+    transferSyntaxUID: String,
+    gappedZ: Boolean
   ): String
 
   companion object {

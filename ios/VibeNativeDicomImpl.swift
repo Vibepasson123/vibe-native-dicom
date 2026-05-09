@@ -70,10 +70,12 @@ import Foundation
   }
 
   @objc public static func buildVolumeFromDicoms(
-    _ dicomPathsJson: NSString
+    _ dicomPathsJson: NSString,
+    resampleNonUniformZ: NSNumber
   ) throws -> NSDictionary {
     let dict = try GdcmBridge.buildVolume(
-      fromDicomPathsJson: dicomPathsJson as String
+      fromDicomPathsJson: dicomPathsJson as String,
+      resampleNonUniformZ: resampleNonUniformZ.boolValue
     )
     return dict as NSDictionary
   }
@@ -100,12 +102,16 @@ import Foundation
   @objc public static func writeSyntheticVolumeSeries(
     _ outDir: NSString,
     numberOfSlices: NSNumber,
-    sliceSpacingMm: NSNumber
+    sliceSpacingMm: NSNumber,
+    transferSyntaxUID: NSString,
+    gappedZ: NSNumber
   ) throws -> NSString {
     let json = try GdcmBridge.writeSyntheticVolumeSeries(
       atDir: outDir as String,
       numberOfSlices: numberOfSlices.intValue,
-      sliceSpacingMm: sliceSpacingMm.doubleValue
+      sliceSpacingMm: sliceSpacingMm.doubleValue,
+      transferSyntaxUID: transferSyntaxUID as String,
+      gappedZ: gappedZ.boolValue
     )
     return json as NSString
   }

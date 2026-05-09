@@ -5,7 +5,10 @@ import { describe, it, expect, jest } from '@jest/globals';
 jest.mock('../../NativeVibeNativeDicom', () => ({
   __esModule: true,
   default: {
-    buildVolumeFromDicoms: (pathsJson: string) => {
+    buildVolumeFromDicoms: (
+      pathsJson: string,
+      resampleNonUniformZ: boolean
+    ) => {
       const arr = JSON.parse(pathsJson);
       return {
         handle: 42,
@@ -18,6 +21,8 @@ jest.mock('../../NativeVibeNativeDicom', () => ({
         pixelSpacingCol: 1,
         sliceSpacing: 2,
         photometricInterpretation: 'MONOCHROME2',
+        // round-trip the resample flag so the test can assert it survives.
+        _resampleArg: resampleNonUniformZ,
       };
     },
     extractMprSlice: (
@@ -40,7 +45,9 @@ jest.mock('../../NativeVibeNativeDicom', () => ({
     writeSyntheticVolumeSeries: (
       outDir: string,
       n: number,
-      _spacing: number
+      _spacing: number,
+      _transferSyntaxUID: string,
+      _gappedZ: boolean
     ) => {
       const arr: string[] = [];
       for (let i = 0; i < n; i++) {
@@ -65,6 +72,27 @@ describe('Phase 5.1 — volume / MPR bridge', () => {
     expect(v.depth).toBe(3);
     expect(v.bitsAllocated).toBe(8);
     expect(v.sliceSpacing).toBe(2);
+  });
+
+  it('buildVolumeFromDicoms forwards Phase 5.2 resampleNonUniformZ option', () => {
+    const v0 = buildVolumeFromDicoms(['/tmp/a.dcm']);
+    const v1 = buildVolumeFromDicoms(['/tmp/a.dcm'], {
+      resampleNonUniformZ: true,
+    });
+    expect((v0 as unknown as { _resampleArg: boolean })._resampleArg).toBe(
+      false
+    );
+    expect((v1 as unknown as { _resampleArg: boolean })._resampleArg).toBe(
+      true
+    );
+  });
+
+  it('writeSyntheticVolumeSeries accepts Phase 5.2 options', () => {
+    const paths = writeSyntheticVolumeSeries('/tmp', 4, 1.5, {
+      transferSyntaxUID: '1.2.840.10008.1.2.4.70',
+      gappedZ: true,
+    });
+    expect(paths).toHaveLength(4);
   });
 
   it('extractMprSlice maps plane string → int and round-trips MprSliceInfo', () => {

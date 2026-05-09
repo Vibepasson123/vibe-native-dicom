@@ -179,6 +179,12 @@ function App() {
     coronal: MprSliceInfo | null;
   }>({ axial: null, sagittal: null, coronal: null });
   const mpr = useMprController(volume);
+  // Phase 5.2 — extra volumes that exercise the lifted limits.
+  const [compressedVolume, setCompressedVolume] = useState<VolumeInfo | null>(
+    null
+  );
+  const [gappedVolume, setGappedVolume] = useState<VolumeInfo | null>(null);
+  const [phase52Err, setPhase52Err] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -317,18 +323,49 @@ function App() {
     }
 
     // Phase 5.1: write a 16-slice synthetic volume series + build it.
+    let dir = '';
     try {
       // Use the same tmpdir as cine path (parent dir of any synthetic file).
       const probe = writeSyntheticDicom(
         TransferSyntaxUID.ImplicitVRLittleEndian,
         1
       );
-      const dir = probe.substring(0, probe.lastIndexOf('/'));
+      dir = probe.substring(0, probe.lastIndexOf('/'));
       const slicePaths = writeSyntheticVolumeSeries(dir, 16, 1.0);
       const v = buildVolumeFromDicoms(slicePaths);
       setVolume(v);
     } catch (err) {
       setMprErr((err as Error).message);
+    }
+
+    // Phase 5.2: build two additional volumes to exercise the lifted
+    // limits — one from a JPEG-Lossless compressed series, one from a
+    // gapped-Z series resampled to a uniform grid. Note: each call to
+    // writeSyntheticVolumeSeries reuses filename pattern vnd-vol-<NNN>,
+    // so subsequent calls overwrite earlier ones. We capture the
+    // returned paths immediately, build the volume in-memory, and the
+    // on-disk files become don't-care after that.
+    if (dir) {
+      try {
+        const compressedPaths = writeSyntheticVolumeSeries(dir, 12, 1.0, {
+          transferSyntaxUID: TransferSyntaxUID.JPEGLosslessProcess14,
+        });
+        const cv = buildVolumeFromDicoms(compressedPaths);
+        setCompressedVolume(cv);
+      } catch (err) {
+        setPhase52Err(`compressed: ${(err as Error).message}`);
+      }
+      try {
+        const gappedPaths = writeSyntheticVolumeSeries(dir, 10, 1.0, {
+          gappedZ: true,
+        });
+        const gv = buildVolumeFromDicoms(gappedPaths, {
+          resampleNonUniformZ: true,
+        });
+        setGappedVolume(gv);
+      } catch (err) {
+        setPhase52Err(`gapped: ${(err as Error).message}`);
+      }
     }
   }, []);
 
@@ -362,6 +399,43 @@ function App() {
       if (volume) releaseVolume(volume.handle);
     };
   }, [volume]);
+
+  // Phase 5.2 — extract centre-axial slices from the compressed +
+  // gapped volumes for thumbnail preview. We don't expose scrollers
+  // for these (Phase 5.1 already proves the scroll UI); the panels
+  // exist to demonstrate that the lifted limits actually work.
+  const [compressedSlice, setCompressedSlice] = useState<MprSliceInfo | null>(
+    null
+  );
+  const [gappedSlice, setGappedSlice] = useState<MprSliceInfo | null>(null);
+  useEffect(() => {
+    if (!compressedVolume) return;
+    try {
+      const idx = Math.floor(compressedVolume.depth / 2);
+      const out = `/tmp/vnd-mpr-cv-${compressedVolume.handle}-${idx}.bin`;
+      setCompressedSlice(
+        extractMprSlice(compressedVolume.handle, 'axial', idx, out)
+      );
+    } catch (err) {
+      setPhase52Err(`compressed slice: ${(err as Error).message}`);
+    }
+    return () => {
+      if (compressedVolume) releaseVolume(compressedVolume.handle);
+    };
+  }, [compressedVolume]);
+  useEffect(() => {
+    if (!gappedVolume) return;
+    try {
+      const idx = Math.floor(gappedVolume.depth / 2);
+      const out = `/tmp/vnd-mpr-gv-${gappedVolume.handle}-${idx}.bin`;
+      setGappedSlice(extractMprSlice(gappedVolume.handle, 'axial', idx, out));
+    } catch (err) {
+      setPhase52Err(`gapped slice: ${(err as Error).message}`);
+    }
+    return () => {
+      if (gappedVolume) releaseVolume(gappedVolume.handle);
+    };
+  }, [gappedVolume]);
 
   const overallPass =
     parityPass === true &&
@@ -878,6 +952,70 @@ function App() {
           })}
         </View>
       )}
+
+      <Text style={styles.section}>MPR limits lifted (Phase 5.2)</Text>
+      {phase52Err && <Text style={styles.fail}>FAIL · {phase52Err}</Text>}
+      <View style={styles.block}>
+        <Text style={styles.label}>
+          JPEG-Lossless compressed series (12 slices, decoded on import)
+        </Text>
+        {compressedVolume && compressedSlice && (
+          <>
+            <Text style={styles.value}>
+              depth {compressedVolume.depth} · spacing{' '}
+              {compressedVolume.sliceSpacing} mm · centre slice{' '}
+              {Math.floor(compressedVolume.depth / 2)}
+            </Text>
+            <View style={styles.viewerWrapper}>
+              <DicomImageViewSkia
+                filePath={compressedSlice.filePath}
+                rows={compressedSlice.rows}
+                columns={compressedSlice.columns}
+                bitsAllocated={compressedSlice.bitsAllocated}
+                photometricInterpretation={
+                  compressedVolume.photometricInterpretation
+                }
+                windowCenter={128}
+                windowWidth={256}
+                width={160}
+                height={160}
+                enableGestures={false}
+              />
+            </View>
+          </>
+        )}
+      </View>
+      <View style={styles.block}>
+        <Text style={styles.label}>
+          Gapped-Z series (10 input slices @ alternating Δz, resampled to a
+          uniform grid)
+        </Text>
+        {gappedVolume && gappedSlice && (
+          <>
+            <Text style={styles.value}>
+              {gappedVolume.depth} resampled slices · uniform spacing{' '}
+              {gappedVolume.sliceSpacing.toFixed(2)} mm · centre slice{' '}
+              {Math.floor(gappedVolume.depth / 2)}
+            </Text>
+            <View style={styles.viewerWrapper}>
+              <DicomImageViewSkia
+                filePath={gappedSlice.filePath}
+                rows={gappedSlice.rows}
+                columns={gappedSlice.columns}
+                bitsAllocated={gappedSlice.bitsAllocated}
+                photometricInterpretation={
+                  gappedVolume.photometricInterpretation
+                }
+                windowCenter={128}
+                windowWidth={256}
+                width={160}
+                height={160}
+                enableGestures={false}
+              />
+            </View>
+          </>
+        )}
+      </View>
 
       <Text style={styles.section}>Overall</Text>
       <Text style={overallPass ? styles.passLarge : styles.failLarge}>

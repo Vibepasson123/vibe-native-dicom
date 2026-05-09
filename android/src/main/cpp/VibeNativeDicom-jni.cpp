@@ -441,7 +441,8 @@ void putDouble(JNIEnv* env, jobject map, jmethodID putMethod, const char* key,
 
 extern "C" JNIEXPORT jobject JNICALL
 Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeBuildVolumeFromDicoms(
-    JNIEnv* env, jobject /* this */, jstring jPathsJson) {
+    JNIEnv* env, jobject /* this */, jstring jPathsJson,
+    jboolean jResample) {
   if (jPathsJson == nullptr) {
     throwJavaRuntime(env, "buildVolumeFromDicoms: null paths");
     return nullptr;
@@ -492,7 +493,9 @@ Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeBuildVolumeFromDic
 
   vnd::VolumeInfo info;
   try {
-    info = vnd::buildVolumeFromDicoms(paths);
+    vnd::BuildVolumeOptions opts;
+    opts.resampleNonUniformZ = (jResample == JNI_TRUE);
+    info = vnd::buildVolumeFromDicoms(paths, opts);
   } catch (const std::exception& e) {
     throwJavaRuntime(env, e.what());
     return nullptr;
@@ -584,7 +587,7 @@ Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeReleaseVolume(
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeWriteSyntheticVolumeSeries(
     JNIEnv* env, jobject /* this */, jstring jOutDir, jint jN,
-    jdouble jSpacing) {
+    jdouble jSpacing, jstring jTsUid, jboolean jGappedZ) {
   if (jOutDir == nullptr) {
     throwJavaRuntime(env, "writeSyntheticVolumeSeries: null outDir");
     return nullptr;
@@ -597,10 +600,20 @@ Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeWriteSyntheticVolu
   std::string outDir(cDir);
   env->ReleaseStringUTFChars(jOutDir, cDir);
 
+  std::string tsUid;
+  if (jTsUid != nullptr) {
+    const char* cTs = env->GetStringUTFChars(jTsUid, nullptr);
+    if (cTs != nullptr) {
+      tsUid.assign(cTs);
+      env->ReleaseStringUTFChars(jTsUid, cTs);
+    }
+  }
+
   std::vector<std::string> paths;
   try {
-    paths = vnd::writeSyntheticVolumeSeries(outDir, static_cast<int>(jN),
-                                             jSpacing);
+    paths = vnd::writeSyntheticVolumeSeries(
+        outDir, static_cast<int>(jN), jSpacing, tsUid,
+        jGappedZ == JNI_TRUE);
   } catch (const std::exception& e) {
     throwJavaRuntime(env, e.what());
     return nullptr;

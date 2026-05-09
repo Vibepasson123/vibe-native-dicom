@@ -209,6 +209,7 @@ static NSDictionary *datasetToDictionary(const vnd::DicomDataset &ds) {
 }
 
 + (nullable NSDictionary *)buildVolumeFromDicomPathsJson:(NSString *)json
+                                     resampleNonUniformZ:(BOOL)resample
                                                    error:(NSError **)error {
   NSData *jsonData = [json dataUsingEncoding:NSUTF8StringEncoding];
   NSError *jsonErr = nil;
@@ -227,9 +228,11 @@ static NSDictionary *datasetToDictionary(const vnd::DicomDataset &ds) {
       paths.emplace_back([(NSString *)entry UTF8String]);
     }
   }
+  vnd::BuildVolumeOptions opts;
+  opts.resampleNonUniformZ = resample == YES;
   vnd::VolumeInfo info;
   try {
-    info = vnd::buildVolumeFromDicoms(paths);
+    info = vnd::buildVolumeFromDicoms(paths, opts);
   } catch (const std::exception &e) {
     if (error) *error = makeError(e.what());
     return nil;
@@ -291,11 +294,14 @@ static NSDictionary *datasetToDictionary(const vnd::DicomDataset &ds) {
 + (nullable NSString *)writeSyntheticVolumeSeriesAtDir:(NSString *)outDir
                                         numberOfSlices:(NSInteger)n
                                         sliceSpacingMm:(double)spacing
+                                     transferSyntaxUID:(NSString *)tsUid
+                                               gappedZ:(BOOL)gappedZ
                                                  error:(NSError **)error {
   std::vector<std::string> paths;
   try {
     paths = vnd::writeSyntheticVolumeSeries(
-        std::string([outDir UTF8String]), static_cast<int>(n), spacing);
+        std::string([outDir UTF8String]), static_cast<int>(n), spacing,
+        std::string([tsUid UTF8String]), gappedZ == YES);
   } catch (const std::exception &e) {
     if (error) *error = makeError(e.what());
     return nil;

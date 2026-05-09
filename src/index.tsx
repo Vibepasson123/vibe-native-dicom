@@ -59,6 +59,8 @@ export {
   releaseVolume,
   writeSyntheticVolumeSeries,
   useMprController,
+  type BuildVolumeOptions,
+  type SyntheticVolumeSeriesOptions,
   type MprPlane,
   type MprSliceInfo,
   type VolumeInfo,

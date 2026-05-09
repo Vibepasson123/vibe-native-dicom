@@ -578,11 +578,30 @@ std::string readBinaryFileAsLatin1(const std::string& path,
 
 // ---- Phase 5.1: synthetic volume series -----------------------------------
 
-std::vector<std::string> writeSyntheticVolumeSeries(const std::string& outDir,
-                                                    int numberOfSlices,
-                                                    double sliceSpacingMm) {
+std::vector<std::string> writeSyntheticVolumeSeries(
+    const std::string& outDir,
+    int numberOfSlices,
+    double sliceSpacingMm,
+    const std::string& transferSyntaxUID,
+    bool gappedZ) {
   if (numberOfSlices < 1) numberOfSlices = 1;
   if (sliceSpacingMm <= 0) sliceSpacingMm = 1.0;
+
+  // Resolve target transfer syntax. Same dispatch as
+  // writeSyntheticDicomFile — empty defaults to Implicit VR LE.
+  gdcm::TransferSyntax::TSType targetType =
+      gdcm::TransferSyntax::ImplicitVRLittleEndian;
+  if (!transferSyntaxUID.empty()) {
+    if (!tsTypeFromUID(transferSyntaxUID, targetType)) {
+      throw std::runtime_error(
+          std::string(
+              "writeSyntheticVolumeSeries: unsupported transfer syntax UID: ") +
+          transferSyntaxUID);
+    }
+  }
+  const bool needsRecompress =
+      targetType != gdcm::TransferSyntax::ImplicitVRLittleEndian &&
+      targetType != gdcm::TransferSyntax::ExplicitVRLittleEndian;
 
   // 16x16 monochrome 8-bit. Each slice gets a per-slice intensity offset so
   // the volume isn't constant along Z (sagittal/coronal reformats need
@@ -628,9 +647,30 @@ std::vector<std::string> writeSyntheticVolumeSeries(const std::string& outDir,
                            static_cast<uint32_t>(pixels.size()));
     img.SetDataElement(pixelData);
 
+    // If the caller asked for a compressed target, run this slice
+    // through GDCM's encoder pipeline (same path as the single-frame
+    // synthetic writer). Per-slice encode is fine: 256 px slices are
+    // tiny and the test only writes ~16 of them.
+    gdcm::Image outImg;
+    if (needsRecompress) {
+      gdcm::ImageChangeTransferSyntax change;
+      change.SetTransferSyntax(gdcm::TransferSyntax(targetType));
+      change.SetInput(img);
+      if (!change.Change()) {
+        throw std::runtime_error(
+            std::string(
+                "writeSyntheticVolumeSeries: GDCM failed to encode slice ") +
+            std::to_string(si) + " to " + transferSyntaxUID);
+      }
+      outImg = change.GetOutput();
+    } else {
+      outImg = img;
+      outImg.SetTransferSyntax(gdcm::TransferSyntax(targetType));
+    }
+
     gdcm::ImageWriter writer;
     writer.SetFileName(slicePath.c_str());
-    writer.SetImage(img);
+    writer.SetImage(outImg);
 
     gdcm::DataSet& ds = writer.GetFile().GetDataSet();
     auto setUI = [&](uint16_t g, uint16_t e, const char* value) {
@@ -669,9 +709,24 @@ std::vector<std::string> writeSyntheticVolumeSeries(const std::string& outDir,
     setText(0x0020, 0x0013, gdcm::VR::IS, inBuf);
     setText(0x0028, 0x0030, gdcm::VR::DS, "1.0\\1.0");
 
-    // ImagePositionPatient (0020,0032) — z increments by sliceSpacingMm.
+    // ImagePositionPatient (0020,0032) — z increments by sliceSpacingMm,
+    // or alternates between sliceSpacingMm and 2*sliceSpacingMm when
+    // gappedZ is set (to exercise the Phase 5.2 resample path).
+    double zOffset = 0;
+    if (gappedZ) {
+      // Sum of step pattern: at step k, +sliceSpacingMm when k is even,
+      // +2*sliceSpacingMm when k is odd. Closed-form for step si:
+      //   z = floor((si+1)/2) * 2*sliceSpacingMm
+      //       + floor(si/2) * sliceSpacingMm
+      // Simpler to compute iteratively below.
+      for (int k = 0; k < si; ++k) {
+        zOffset += (k % 2 == 0) ? sliceSpacingMm : (2.0 * sliceSpacingMm);
+      }
+    } else {
+      zOffset = si * sliceSpacingMm;
+    }
     char ippBuf[64];
-    std::snprintf(ippBuf, sizeof(ippBuf), "0\\0\\%g", si * sliceSpacingMm);
+    std::snprintf(ippBuf, sizeof(ippBuf), "0\\0\\%g", zOffset);
     setText(0x0020, 0x0032, gdcm::VR::DS, ippBuf);
 
     if (!writer.Write()) {

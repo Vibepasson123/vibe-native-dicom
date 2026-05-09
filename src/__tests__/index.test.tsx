@@ -127,7 +127,10 @@ jest.mock('../NativeVibeNativeDicom', () => {
         _sopUID: string,
         _sopClassUID: string
       ) => outPath,
-      buildVolumeFromDicoms: (_pathsJson: string) => ({
+      buildVolumeFromDicoms: (
+        _pathsJson: string,
+        _resampleNonUniformZ: boolean
+      ) => ({
         handle: 1,
         columns: 16,
         rows: 16,
@@ -158,7 +161,9 @@ jest.mock('../NativeVibeNativeDicom', () => {
       writeSyntheticVolumeSeries: (
         outDir: string,
         n: number,
-        _spacing: number
+        _spacing: number,
+        _transferSyntaxUID: string,
+        _gappedZ: boolean
       ) => {
         const arr: string[] = [];
         for (let i = 0; i < n; i++) {
