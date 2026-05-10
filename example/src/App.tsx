@@ -52,6 +52,9 @@ import {
   // Phase 5.3 — oblique
   extractObliqueSlice,
   useObliqueController,
+  // Phase 6.1 — slab projection (MIP / MinIP / Average)
+  extractProjectionSlab,
+  type ProjectionMode,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -192,6 +195,13 @@ function App() {
   const oblique = useObliqueController(volume);
   const [obliqueSlice, setObliqueSlice] = useState<MprSliceInfo | null>(null);
   const [obliqueErr, setObliqueErr] = useState<string | null>(null);
+  // Phase 6.1 — slab projection on the same plane.
+  const [projectionMode, setProjectionMode] = useState<ProjectionMode>('mip');
+  const [slabThicknessMm, setSlabThicknessMm] = useState<number>(8);
+  const [projectionSlice, setProjectionSlice] = useState<MprSliceInfo | null>(
+    null
+  );
+  const [projectionErr, setProjectionErr] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -459,6 +469,36 @@ function App() {
       setObliqueErr((err as Error).message);
     }
   }, [volume, oblique.spec, oblique.rotX, oblique.rotY, oblique.rotZ]);
+
+  // Phase 6.1 — re-extract the slab projection when rotation, mode,
+  // slab thickness, or volume changes. Same plane as the oblique
+  // viewer so users can A/B-compare a single slice vs the projected
+  // slab live.
+  useEffect(() => {
+    if (!volume || !oblique.spec) return;
+    try {
+      const out = `/tmp/vnd-proj-${volume.handle}-${projectionMode}-${slabThicknessMm}-${oblique.rotX.toFixed(3)}-${oblique.rotY.toFixed(3)}-${oblique.rotZ.toFixed(3)}.bin`;
+      setProjectionSlice(
+        extractProjectionSlab(
+          volume.handle,
+          oblique.spec,
+          { slabThicknessMm, mode: projectionMode },
+          out
+        )
+      );
+      setProjectionErr(null);
+    } catch (err) {
+      setProjectionErr((err as Error).message);
+    }
+  }, [
+    volume,
+    oblique.spec,
+    oblique.rotX,
+    oblique.rotY,
+    oblique.rotZ,
+    projectionMode,
+    slabThicknessMm,
+  ]);
 
   const overallPass =
     parityPass === true &&
@@ -1049,6 +1089,69 @@ function App() {
           <Text style={styles.sliderButton} onPress={oblique.reset}>
             Reset
           </Text>
+        </View>
+      )}
+
+      <Text style={styles.section}>
+        Slab projection · MIP / MinIP / Average (Phase 6.1)
+      </Text>
+      {projectionErr && <Text style={styles.fail}>FAIL · {projectionErr}</Text>}
+      {!volume && !projectionErr && <ActivityIndicator />}
+      {volume && oblique.spec && (
+        <View style={styles.block}>
+          <Text style={styles.label}>
+            Cast a ray of {slabThicknessMm} mm along the Phase 5.3 plane normal
+            · ray-reduce by {projectionMode.toUpperCase()}
+          </Text>
+          <View style={styles.viewerWrapper}>
+            {projectionSlice && (
+              <DicomImageViewSkia
+                filePath={projectionSlice.filePath}
+                rows={projectionSlice.rows}
+                columns={projectionSlice.columns}
+                bitsAllocated={projectionSlice.bitsAllocated}
+                photometricInterpretation={volume.photometricInterpretation}
+                windowCenter={128}
+                windowWidth={256}
+                width={192}
+                height={192}
+                enableGestures={false}
+              />
+            )}
+          </View>
+          <Text style={styles.label}>Mode</Text>
+          <View style={styles.sliderRow}>
+            {(['mip', 'minip', 'average'] as ProjectionMode[]).map((m) => {
+              const active = m === projectionMode;
+              return (
+                <Text
+                  key={m}
+                  style={[styles.toolButton, active && styles.toolButtonActive]}
+                  onPress={() => setProjectionMode(m)}
+                >
+                  {m.toUpperCase()}
+                </Text>
+              );
+            })}
+          </View>
+          <Text style={styles.label}>Slab thickness</Text>
+          <View style={styles.sliderRow}>
+            <Text
+              style={styles.sliderButton}
+              onPress={() =>
+                setSlabThicknessMm(Math.max(0, slabThicknessMm - 4))
+              }
+            >
+              −
+            </Text>
+            <Text style={styles.sliderValue}>{slabThicknessMm} mm</Text>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => setSlabThicknessMm(slabThicknessMm + 4)}
+            >
+              +
+            </Text>
+          </View>
         </View>
       )}
 

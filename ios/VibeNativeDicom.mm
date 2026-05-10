@@ -130,6 +130,30 @@
   return result;
 }
 
+- (id)extractProjectionSlab:(double)handle
+                   specJson:(NSString *)specJson
+            slabThicknessMm:(double)slabThicknessMm
+                     stepMm:(double)stepMm
+                       mode:(double)mode
+                    outPath:(NSString *)outPath {
+  NSError *error = nil;
+  NSDictionary *result = [VibeNativeDicomImpl
+      extractProjectionSlab:@(handle)
+                   specJson:specJson
+            slabThicknessMm:@(slabThicknessMm)
+                     stepMm:@(stepMm)
+                       mode:@(mode)
+                    outPath:outPath
+                      error:&error];
+  if (result == nil) {
+    @throw [NSException
+        exceptionWithName:@"VibeNativeDicomError"
+                   reason:error.localizedDescription ?: @"extractProjectionSlab failed"
+                 userInfo:nil];
+  }
+  return result;
+}
+
 - (NSString *)writeSyntheticVolumeSeries:(NSString *)outDir
                           numberOfSlices:(double)n
                           sliceSpacingMm:(double)spacing

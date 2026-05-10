@@ -127,6 +127,20 @@ export interface Spec extends TurboModule {
     specJson: string,
     outPath: string
   ): Object;
+
+  // Phase 6.1 — slab projection (MIP / MinIP / Average). Plane spec is
+  // the same JSON-encoded ObliqueSpec; mode is 0=MIP, 1=MinIP, 2=Average.
+  // slabThicknessMm=0 falls back to a single sample (same as
+  // extractObliqueSlice). stepMm=0 defaults to the smallest input
+  // axis spacing.
+  extractProjectionSlab(
+    handle: number,
+    specJson: string,
+    slabThicknessMm: number,
+    stepMm: number,
+    mode: number,
+    outPath: string
+  ): Object;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('VibeNativeDicom');

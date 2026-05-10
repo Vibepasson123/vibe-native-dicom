@@ -584,6 +584,142 @@ Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeReleaseVolume(
   vnd::releaseVolume(static_cast<long long>(jHandle));
 }
 
+// Internal helper used by both extractObliqueSlice and
+// extractProjectionSlab — parses an ObliqueSpec JSON object.
+namespace {
+bool parseObliqueSpec(const std::string& specJson, vnd::ObliqueSpec& out) {
+  auto skipWs = [](const std::string& s, size_t& i) {
+    while (i < s.size() && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n' ||
+                             s[i] == '\r' || s[i] == '\f'))
+      ++i;
+  };
+  auto findKey = [&](const std::string& s, const std::string& key) -> size_t {
+    const std::string needle = "\"" + key + "\"";
+    size_t pos = s.find(needle);
+    if (pos == std::string::npos) return std::string::npos;
+    pos += needle.size();
+    skipWs(s, pos);
+    if (pos >= s.size() || s[pos] != ':') return std::string::npos;
+    ++pos;
+    skipWs(s, pos);
+    return pos;
+  };
+  auto readDouble = [&](size_t& i) -> double {
+    skipWs(specJson, i);
+    size_t start = i;
+    while (i < specJson.size() &&
+           (specJson[i] == '-' || specJson[i] == '+' || specJson[i] == '.' ||
+            specJson[i] == 'e' || specJson[i] == 'E' ||
+            (specJson[i] >= '0' && specJson[i] <= '9'))) {
+      ++i;
+    }
+    if (start == i) return 0;
+    try {
+      return std::stod(specJson.substr(start, i - start));
+    } catch (...) {
+      return 0;
+    }
+  };
+  auto readVec = [&](const std::string& key, double dst[3]) -> bool {
+    size_t pos = findKey(specJson, key);
+    if (pos == std::string::npos) return false;
+    if (pos >= specJson.size() || specJson[pos] != '[') return false;
+    ++pos;
+    dst[0] = readDouble(pos);
+    skipWs(specJson, pos);
+    if (pos < specJson.size() && specJson[pos] == ',') ++pos;
+    dst[1] = readDouble(pos);
+    skipWs(specJson, pos);
+    if (pos < specJson.size() && specJson[pos] == ',') ++pos;
+    dst[2] = readDouble(pos);
+    return true;
+  };
+
+  if (!readVec("centerMm", out.centerMm) || !readVec("uMm", out.uMm) ||
+      !readVec("vMm", out.vMm)) {
+    return false;
+  }
+  size_t pos = findKey(specJson, "columns");
+  if (pos != std::string::npos) out.columns = static_cast<int>(readDouble(pos));
+  pos = findKey(specJson, "rows");
+  if (pos != std::string::npos) out.rows = static_cast<int>(readDouble(pos));
+  pos = findKey(specJson, "pixelSpacingMm");
+  if (pos != std::string::npos) out.pixelSpacingMm = readDouble(pos);
+  return true;
+}
+
+jobject sliceInfoToHashMap(JNIEnv* env, const vnd::MprSliceInfo& info) {
+  jclass mapCls = env->FindClass("java/util/HashMap");
+  jmethodID mapCtor = env->GetMethodID(mapCls, "<init>", "()V");
+  jmethodID putMethod = env->GetMethodID(
+      mapCls, "put",
+      "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+  jobject root = newHashMap(env, mapCls, mapCtor);
+  putString(env, root, putMethod, "filePath", info.filePath);
+  putDouble(env, root, putMethod, "byteLength",
+            static_cast<double>(info.byteLength));
+  putInt(env, root, putMethod, "rows", info.rows);
+  putInt(env, root, putMethod, "columns", info.columns);
+  putInt(env, root, putMethod, "bitsAllocated", info.bitsAllocated);
+  putInt(env, root, putMethod, "pixelRepresentation",
+         info.pixelRepresentation);
+  putDouble(env, root, putMethod, "pixelSpacingRow", info.pixelSpacingRow);
+  putDouble(env, root, putMethod, "pixelSpacingCol", info.pixelSpacingCol);
+  env->DeleteLocalRef(mapCls);
+  return root;
+}
+}  // namespace
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeExtractProjectionSlab(
+    JNIEnv* env, jobject /* this */, jdouble jHandle, jstring jSpecJson,
+    jdouble jSlabThicknessMm, jdouble jStepMm, jint jMode,
+    jstring jOutPath) {
+  if (jSpecJson == nullptr || jOutPath == nullptr) {
+    throwJavaRuntime(env, "extractProjectionSlab: null arg");
+    return nullptr;
+  }
+  const char* cJson = env->GetStringUTFChars(jSpecJson, nullptr);
+  const char* cOut = env->GetStringUTFChars(jOutPath, nullptr);
+  if (cJson == nullptr || cOut == nullptr) {
+    if (cJson) env->ReleaseStringUTFChars(jSpecJson, cJson);
+    if (cOut) env->ReleaseStringUTFChars(jOutPath, cOut);
+    throwJavaRuntime(env, "extractProjectionSlab: bad string encoding");
+    return nullptr;
+  }
+  std::string specJson(cJson);
+  std::string outPath(cOut);
+  env->ReleaseStringUTFChars(jSpecJson, cJson);
+  env->ReleaseStringUTFChars(jOutPath, cOut);
+
+  vnd::ObliqueSpec spec;
+  if (!parseObliqueSpec(specJson, spec)) {
+    throwJavaRuntime(env,
+                     "extractProjectionSlab: invalid ObliqueSpec JSON");
+    return nullptr;
+  }
+  vnd::ProjectionMode mode;
+  switch (static_cast<int>(jMode)) {
+    case 0: mode = vnd::ProjectionMode::Mip; break;
+    case 1: mode = vnd::ProjectionMode::MinIp; break;
+    case 2: mode = vnd::ProjectionMode::Average; break;
+    default:
+      throwJavaRuntime(env, "extractProjectionSlab: invalid mode");
+      return nullptr;
+  }
+
+  vnd::MprSliceInfo info;
+  try {
+    info = vnd::extractProjectionSlab(static_cast<long long>(jHandle), spec,
+                                       jSlabThicknessMm, jStepMm, mode,
+                                       outPath);
+  } catch (const std::exception& e) {
+    throwJavaRuntime(env, e.what());
+    return nullptr;
+  }
+  return sliceInfoToHashMap(env, info);
+}
+
 extern "C" JNIEXPORT jobject JNICALL
 Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeExtractObliqueSlice(
     JNIEnv* env, jobject /* this */, jdouble jHandle, jstring jSpecJson,

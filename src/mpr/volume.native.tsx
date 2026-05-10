@@ -4,8 +4,16 @@ import type {
   MprPlane,
   MprSliceInfo,
   ObliqueSpec,
+  ProjectionMode,
+  ProjectionOptions,
   VolumeInfo,
 } from './types';
+
+const PROJECTION_MODE_TO_INT: Record<ProjectionMode, number> = {
+  mip: 0,
+  minip: 1,
+  average: 2,
+};
 
 const PLANE_TO_INT: Record<MprPlane, number> = {
   axial: 0,
@@ -49,6 +57,22 @@ export function extractObliqueSlice(
   return VibeNativeDicom.extractObliqueSlice(
     handle,
     JSON.stringify(spec),
+    outPath
+  ) as MprSliceInfo;
+}
+
+export function extractProjectionSlab(
+  handle: number,
+  spec: ObliqueSpec,
+  opts: ProjectionOptions,
+  outPath: string
+): MprSliceInfo {
+  return VibeNativeDicom.extractProjectionSlab(
+    handle,
+    JSON.stringify(spec),
+    opts.slabThicknessMm,
+    opts.stepMm ?? 0,
+    PROJECTION_MODE_TO_INT[opts.mode],
     outPath
   ) as MprSliceInfo;
 }

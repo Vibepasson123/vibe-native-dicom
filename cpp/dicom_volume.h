@@ -160,4 +160,33 @@ struct ObliqueSpec {
 MprSliceInfo extractObliqueSlice(long long handle, const ObliqueSpec& spec,
                                  const std::string& outPath);
 
+// Phase 6.1 — slab projection (Maximum / Minimum / Average Intensity
+// Projection).
+//
+// For each output pixel along the oblique plane defined by `spec`,
+// cast a ray of length `slabThicknessMm` along the plane's normal
+// (u × v), centred on the plane. Reduce sampled values by:
+//   MIP     = max  (vessels, bone — bright structures stand out)
+//   MinIP   = min  (airways, lungs — dark structures stand out)
+//   Average = mean (X-ray-like radiograph)
+//
+// Step size along the ray defaults to the smallest axis spacing of the
+// volume; use stepMm=0 to opt into that default. The result has the
+// same shape as extractObliqueSlice — the viewer pipeline doesn't need
+// a special case.
+//
+// `slabThicknessMm` of 0 falls back to a single-sample-per-ray (i.e.
+// behaves like extractObliqueSlice). For full-volume MIP, pass
+// slabThicknessMm = volume diagonal in mm.
+enum class ProjectionMode : int {
+  Mip = 0,     // Maximum Intensity Projection
+  MinIp = 1,   // Minimum Intensity Projection
+  Average = 2, // Average along ray
+};
+
+MprSliceInfo extractProjectionSlab(long long handle, const ObliqueSpec& spec,
+                                   double slabThicknessMm, double stepMm,
+                                   ProjectionMode mode,
+                                   const std::string& outPath);
+
 }  // namespace vnd

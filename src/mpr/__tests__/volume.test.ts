@@ -59,6 +59,30 @@ jest.mock('../../NativeVibeNativeDicom', () => ({
         pixelSpacingCol: spec.pixelSpacingMm,
       };
     },
+    extractProjectionSlab: (
+      _handle: number,
+      specJson: string,
+      slabThicknessMm: number,
+      stepMm: number,
+      mode: number,
+      outPath: string
+    ) => {
+      const spec = JSON.parse(specJson);
+      return {
+        filePath: outPath,
+        byteLength: spec.rows * spec.columns,
+        rows: spec.rows,
+        columns: spec.columns,
+        bitsAllocated: 8,
+        pixelRepresentation: 0,
+        pixelSpacingRow: spec.pixelSpacingMm,
+        pixelSpacingCol: spec.pixelSpacingMm,
+        // Round-trip the args for the test to assert.
+        _slabThicknessMm: slabThicknessMm,
+        _stepMm: stepMm,
+        _mode: mode,
+      };
+    },
     writeSyntheticVolumeSeries: (
       outDir: string,
       n: number,
@@ -79,6 +103,7 @@ import {
   buildVolumeFromDicoms,
   extractMprSlice,
   extractObliqueSlice,
+  extractProjectionSlab,
   releaseVolume,
   writeSyntheticVolumeSeries,
 } from '../volume.native';
@@ -123,6 +148,45 @@ describe('Phase 5.1 — volume / MPR bridge', () => {
     expect(slice.columns).toBe(64);
     expect(slice.pixelSpacingRow).toBe(0.5);
     expect(slice.pixelSpacingCol).toBe(0.5);
+  });
+
+  it('extractProjectionSlab maps mode string → int and forwards slab/step args', () => {
+    const spec = {
+      centerMm: [0, 0, 0] as [number, number, number],
+      uMm: [1, 0, 0] as [number, number, number],
+      vMm: [0, 1, 0] as [number, number, number],
+      columns: 32,
+      rows: 32,
+      pixelSpacingMm: 0.5,
+    };
+    const mip = extractProjectionSlab(
+      42,
+      spec,
+      { slabThicknessMm: 10, stepMm: 0.5, mode: 'mip' },
+      '/tmp/mip.bin'
+    );
+    expect((mip as unknown as { _mode: number })._mode).toBe(0);
+    expect(
+      (mip as unknown as { _slabThicknessMm: number })._slabThicknessMm
+    ).toBe(10);
+    expect((mip as unknown as { _stepMm: number })._stepMm).toBe(0.5);
+
+    const minip = extractProjectionSlab(
+      42,
+      spec,
+      { slabThicknessMm: 10, mode: 'minip' },
+      '/tmp/minip.bin'
+    );
+    expect((minip as unknown as { _mode: number })._mode).toBe(1);
+    expect((minip as unknown as { _stepMm: number })._stepMm).toBe(0); // default
+
+    const avg = extractProjectionSlab(
+      42,
+      spec,
+      { slabThicknessMm: 10, mode: 'average' },
+      '/tmp/avg.bin'
+    );
+    expect((avg as unknown as { _mode: number })._mode).toBe(2);
   });
 
   it('writeSyntheticVolumeSeries accepts Phase 5.2 options', () => {

@@ -733,4 +733,162 @@ MprSliceInfo extractObliqueSlice(long long handle, const ObliqueSpec& spec,
   return info;
 }
 
+// ---- Phase 6.1: slab projection (MIP/MinIP/Average) -----------------------
+
+MprSliceInfo extractProjectionSlab(long long handle, const ObliqueSpec& spec,
+                                   double slabThicknessMm, double stepMm,
+                                   ProjectionMode mode,
+                                   const std::string& outPath) {
+  std::lock_guard<std::mutex> lock(registryMutex());
+  auto it = registry().find(handle);
+  if (it == registry().end()) {
+    throw std::runtime_error(
+        "extractProjectionSlab: invalid volume handle");
+  }
+  const InternalVolume& v = it->second;
+  if (spec.columns <= 0 || spec.rows <= 0) {
+    throw std::runtime_error(
+        "extractProjectionSlab: columns and rows must be > 0");
+  }
+  if (spec.pixelSpacingMm <= 0) {
+    throw std::runtime_error(
+        "extractProjectionSlab: pixelSpacingMm must be > 0");
+  }
+  if (slabThicknessMm < 0) {
+    throw std::runtime_error(
+        "extractProjectionSlab: slabThicknessMm must be >= 0");
+  }
+  // Default step = smallest input axis spacing. Sub-voxel sampling
+  // would be Nyquist-correct but doubles the cost — voxel-spacing is
+  // a good middle ground for clinical CT.
+  const double defaultStep =
+      std::min({v.pixelSpacingCol, v.pixelSpacingRow, v.sliceSpacing});
+  if (stepMm <= 0) stepMm = defaultStep;
+
+  const int bpp = v.bytesPerPixel;
+  const bool signed16 =
+      (v.bitsAllocated == 16) && (v.pixelRepresentation == 1);
+  const double sx = v.pixelSpacingCol;
+  const double sy = v.pixelSpacingRow;
+  const double sz = v.sliceSpacing;
+
+  // Plane normal = u × v.
+  const double nx = spec.uMm[1] * spec.vMm[2] - spec.uMm[2] * spec.vMm[1];
+  const double ny = spec.uMm[2] * spec.vMm[0] - spec.uMm[0] * spec.vMm[2];
+  const double nz = spec.uMm[0] * spec.vMm[1] - spec.uMm[1] * spec.vMm[0];
+
+  // Number of samples along the ray. ≥1 always so single-plane spec
+  // (slabThicknessMm=0) still produces output.
+  int numSamples =
+      slabThicknessMm <= 0
+          ? 1
+          : std::max(1, static_cast<int>(std::round(slabThicknessMm / stepMm)) + 1);
+
+  const size_t outBytes =
+      static_cast<size_t>(spec.rows) * spec.columns * bpp;
+  std::vector<unsigned char> out(outBytes, 0);
+
+  const double halfW = (spec.columns - 1) / 2.0;
+  const double halfH = (spec.rows - 1) / 2.0;
+  const double halfSlab = slabThicknessMm / 2.0;
+
+  for (int j = 0; j < spec.rows; ++j) {
+    for (int i = 0; i < spec.columns; ++i) {
+      const double du = (i - halfW) * spec.pixelSpacingMm;
+      const double dv = (j - halfH) * spec.pixelSpacingMm;
+      const double basePx =
+          spec.centerMm[0] + du * spec.uMm[0] + dv * spec.vMm[0];
+      const double basePy =
+          spec.centerMm[1] + du * spec.uMm[1] + dv * spec.vMm[1];
+      const double basePz =
+          spec.centerMm[2] + du * spec.uMm[2] + dv * spec.vMm[2];
+
+      // Walk the ray from -halfSlab to +halfSlab along n. Track the
+      // running accumulator in the input domain (signed 32-bit is
+      // enough headroom for 16-bit samples).
+      double acc = 0;
+      double maxV = 0;
+      double minV = 0;
+      bool first = true;
+      for (int k = 0; k < numSamples; ++k) {
+        // Position along the ray in [-halfSlab, +halfSlab].
+        const double t = numSamples == 1
+            ? 0.0
+            : -halfSlab + (k * 2.0 * halfSlab) / (numSamples - 1);
+        const double wx = basePx + t * nx;
+        const double wy = basePy + t * ny;
+        const double wz = basePz + t * nz;
+        const double vx = wx / sx;
+        const double vy = wy / sy;
+        const double vz = wz / sz;
+        const double sample = trilinearSample(v, vx, vy, vz);
+        if (first) {
+          maxV = sample;
+          minV = sample;
+          acc = sample;
+          first = false;
+        } else {
+          if (sample > maxV) maxV = sample;
+          if (sample < minV) minV = sample;
+          acc += sample;
+        }
+      }
+      double reduced;
+      switch (mode) {
+        case ProjectionMode::Mip:
+          reduced = maxV;
+          break;
+        case ProjectionMode::MinIp:
+          reduced = minV;
+          break;
+        case ProjectionMode::Average:
+          reduced = numSamples > 0 ? acc / numSamples : 0;
+          break;
+      }
+
+      unsigned char* dst = out.data() + (j * spec.columns + i) * bpp;
+      if (bpp == 1) {
+        const int rounded = static_cast<int>(std::round(reduced));
+        const int clamped = std::min(255, std::max(0, rounded));
+        dst[0] = static_cast<unsigned char>(clamped);
+      } else {
+        int rounded = static_cast<int>(std::round(reduced));
+        if (signed16) {
+          if (rounded < -32768) rounded = -32768;
+          else if (rounded > 32767) rounded = 32767;
+          if (rounded < 0) rounded += 65536;
+        } else {
+          if (rounded < 0) rounded = 0;
+          else if (rounded > 65535) rounded = 65535;
+        }
+        dst[0] = static_cast<unsigned char>(rounded & 0xFF);
+        dst[1] = static_cast<unsigned char>((rounded >> 8) & 0xFF);
+      }
+    }
+  }
+
+  std::FILE* fp = std::fopen(outPath.c_str(), "wb");
+  if (!fp) {
+    throw std::runtime_error(
+        std::string("extractProjectionSlab: cannot open ") + outPath);
+  }
+  const size_t written = std::fwrite(out.data(), 1, out.size(), fp);
+  std::fclose(fp);
+  if (written != out.size()) {
+    throw std::runtime_error(
+        std::string("extractProjectionSlab: short write to ") + outPath);
+  }
+
+  MprSliceInfo info;
+  info.filePath = outPath;
+  info.byteLength = static_cast<long long>(out.size());
+  info.rows = spec.rows;
+  info.columns = spec.columns;
+  info.bitsAllocated = v.bitsAllocated;
+  info.pixelRepresentation = v.pixelRepresentation;
+  info.pixelSpacingRow = spec.pixelSpacingMm;
+  info.pixelSpacingCol = spec.pixelSpacingMm;
+  return info;
+}
+
 }  // namespace vnd

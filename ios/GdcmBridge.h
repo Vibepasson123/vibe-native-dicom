@@ -95,6 +95,18 @@ NS_ASSUME_NONNULL_BEGIN
                                                    toPath:(NSString *)outPath
                                                     error:(NSError **)error;
 
+// Phase 6.1 — extract a slab projection (MIP / MinIP / Average).
+// mode: 0=MIP, 1=MinIP, 2=Average. slabThicknessMm=0 falls back to a
+// single sample per ray (= extractObliqueSlice). stepMm=0 defaults to
+// the smallest input axis spacing.
++ (nullable NSDictionary *)extractProjectionSlabFromHandle:(double)handle
+                                                   specJson:(NSString *)specJson
+                                            slabThicknessMm:(double)slabThicknessMm
+                                                     stepMm:(double)stepMm
+                                                       mode:(NSInteger)mode
+                                                     toPath:(NSString *)outPath
+                                                      error:(NSError **)error;
+
 // Phase 5.1 — write a synthetic volume series; returns a JSON-encoded
 // array of slice paths. Phase 5.2 options: transferSyntaxUID + gappedZ.
 + (nullable NSString *)writeSyntheticVolumeSeriesAtDir:(NSString *)outDir

@@ -291,6 +291,77 @@ static NSDictionary *datasetToDictionary(const vnd::DicomDataset &ds) {
   vnd::releaseVolume(static_cast<long long>(handle));
 }
 
++ (nullable NSDictionary *)extractProjectionSlabFromHandle:(double)handle
+                                                   specJson:(NSString *)specJson
+                                            slabThicknessMm:(double)slabThicknessMm
+                                                     stepMm:(double)stepMm
+                                                       mode:(NSInteger)mode
+                                                     toPath:(NSString *)outPath
+                                                      error:(NSError **)error {
+  NSData *jsonData = [specJson dataUsingEncoding:NSUTF8StringEncoding];
+  NSError *jsonErr = nil;
+  id parsed = [NSJSONSerialization JSONObjectWithData:jsonData
+                                              options:0
+                                                error:&jsonErr];
+  if (jsonErr || ![parsed isKindOfClass:[NSDictionary class]]) {
+    if (error)
+      *error = makeError(
+          std::string("extractProjectionSlab: specJson must be a JSON object"));
+    return nil;
+  }
+  NSDictionary *dict = (NSDictionary *)parsed;
+  auto readVec = [&](NSString *key, double out[3]) -> bool {
+    NSArray *arr = dict[key];
+    if (![arr isKindOfClass:[NSArray class]] || arr.count < 3) return false;
+    out[0] = [arr[0] doubleValue];
+    out[1] = [arr[1] doubleValue];
+    out[2] = [arr[2] doubleValue];
+    return true;
+  };
+  vnd::ObliqueSpec spec;
+  if (!readVec(@"centerMm", spec.centerMm) ||
+      !readVec(@"uMm", spec.uMm) || !readVec(@"vMm", spec.vMm)) {
+    if (error)
+      *error = makeError(
+          std::string("extractProjectionSlab: missing centerMm/uMm/vMm"));
+    return nil;
+  }
+  spec.columns = [dict[@"columns"] intValue];
+  spec.rows = [dict[@"rows"] intValue];
+  spec.pixelSpacingMm = [dict[@"pixelSpacingMm"] doubleValue];
+
+  vnd::ProjectionMode m;
+  switch (mode) {
+    case 0: m = vnd::ProjectionMode::Mip; break;
+    case 1: m = vnd::ProjectionMode::MinIp; break;
+    case 2: m = vnd::ProjectionMode::Average; break;
+    default:
+      if (error)
+        *error = makeError("extractProjectionSlab: invalid mode");
+      return nil;
+  }
+
+  vnd::MprSliceInfo info;
+  try {
+    info = vnd::extractProjectionSlab(static_cast<long long>(handle), spec,
+                                       slabThicknessMm, stepMm, m,
+                                       std::string([outPath UTF8String]));
+  } catch (const std::exception &e) {
+    if (error) *error = makeError(e.what());
+    return nil;
+  }
+  return @{
+    @"filePath": [NSString stringWithUTF8String:info.filePath.c_str()],
+    @"byteLength": @(static_cast<double>(info.byteLength)),
+    @"rows": @(info.rows),
+    @"columns": @(info.columns),
+    @"bitsAllocated": @(info.bitsAllocated),
+    @"pixelRepresentation": @(info.pixelRepresentation),
+    @"pixelSpacingRow": @(info.pixelSpacingRow),
+    @"pixelSpacingCol": @(info.pixelSpacingCol),
+  };
+}
+
 + (nullable NSDictionary *)extractObliqueSliceFromHandle:(double)handle
                                                  specJson:(NSString *)specJson
                                                    toPath:(NSString *)outPath

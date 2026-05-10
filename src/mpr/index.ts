@@ -3,12 +3,15 @@ export type {
   MprPlane,
   MprSliceInfo,
   ObliqueSpec,
+  ProjectionMode,
+  ProjectionOptions,
   VolumeInfo,
 } from './types';
 export {
   buildVolumeFromDicoms,
   extractMprSlice,
   extractObliqueSlice,
+  extractProjectionSlab,
   releaseVolume,
   writeSyntheticVolumeSeries,
   type SyntheticVolumeSeriesOptions,

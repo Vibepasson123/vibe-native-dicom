@@ -51,6 +51,27 @@ export type ObliqueSpec = {
   pixelSpacingMm: number;
 };
 
+/**
+ * Phase 6.1 — slab projection mode.
+ *   'mip'     — Maximum Intensity Projection (vessels, bone)
+ *   'minip'   — Minimum Intensity Projection (airways, lungs)
+ *   'average' — Mean along ray (X-ray-like reconstruction)
+ */
+export type ProjectionMode = 'mip' | 'minip' | 'average';
+
+/**
+ * Phase 6.1 — slab projection options. The plane is defined by the
+ * supplied ObliqueSpec; the slab spans `slabThicknessMm` along the
+ * plane normal, centred on the plane.
+ */
+export type ProjectionOptions = {
+  /** mm along the plane normal. Pass 0 for single-sample-per-ray (= oblique slice). */
+  slabThicknessMm: number;
+  /** Sample spacing along the ray in mm. Pass 0 for the volume's smallest axis spacing. */
+  stepMm?: number;
+  mode: ProjectionMode;
+};
+
 export type VolumeInfo = {
   /** Stable handle returned by `buildVolumeFromDicoms`. Pass to slice
    *  extractors and to `releaseVolume`. */
