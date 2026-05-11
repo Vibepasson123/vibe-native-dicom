@@ -83,6 +83,31 @@ jest.mock('../../NativeVibeNativeDicom', () => ({
         _mode: mode,
       };
     },
+    extractVolumeRender: (
+      _handle: number,
+      specJson: string,
+      slabThicknessMm: number,
+      stepMm: number,
+      tfJson: string,
+      outPath: string
+    ) => {
+      const spec = JSON.parse(specJson);
+      const tf = JSON.parse(tfJson) as Array<unknown>;
+      return {
+        filePath: outPath,
+        byteLength: spec.rows * spec.columns * 4,
+        rows: spec.rows,
+        columns: spec.columns,
+        bitsAllocated: 8,
+        pixelRepresentation: 0,
+        pixelSpacingRow: spec.pixelSpacingMm,
+        pixelSpacingCol: spec.pixelSpacingMm,
+        samplesPerPixel: 4,
+        _slabThicknessMm: slabThicknessMm,
+        _stepMm: stepMm,
+        _tfPointsLen: tf.length,
+      };
+    },
     writeSyntheticVolumeSeries: (
       outDir: string,
       n: number,
@@ -104,9 +129,11 @@ import {
   extractMprSlice,
   extractObliqueSlice,
   extractProjectionSlab,
+  extractVolumeRender,
   releaseVolume,
   writeSyntheticVolumeSeries,
 } from '../volume.native';
+import { TF_PRESETS } from '../transferFunctions';
 
 describe('Phase 5.1 — volume / MPR bridge', () => {
   it('buildVolumeFromDicoms returns the documented VolumeInfo shape', () => {
@@ -211,6 +238,40 @@ describe('Phase 5.1 — volume / MPR bridge', () => {
     const c = extractMprSlice(42, 'coronal', 7, '/tmp/c.bin');
     expect(c.rows).toBe(8);
     expect(c.columns).toBe(16);
+  });
+
+  it('extractVolumeRender forwards transfer function points and slab/step args', () => {
+    const spec = {
+      centerMm: [0, 0, 0] as [number, number, number],
+      uMm: [1, 0, 0] as [number, number, number],
+      vMm: [0, 1, 0] as [number, number, number],
+      columns: 32,
+      rows: 32,
+      pixelSpacingMm: 0.5,
+    };
+    const out = extractVolumeRender(
+      42,
+      spec,
+      {
+        slabThicknessMm: 20,
+        stepMm: 0.5,
+        transferFunction: TF_PRESETS['gray-8bit'],
+      },
+      '/tmp/vr.bin'
+    );
+    expect(out.filePath).toBe('/tmp/vr.bin');
+    expect(out.rows).toBe(32);
+    expect(out.columns).toBe(32);
+    expect(out.samplesPerPixel).toBe(4);
+    // RGBA bytes = rows * cols * 4
+    expect(out.byteLength).toBe(32 * 32 * 4);
+    expect(
+      (out as unknown as { _slabThicknessMm: number })._slabThicknessMm
+    ).toBe(20);
+    expect((out as unknown as { _stepMm: number })._stepMm).toBe(0.5);
+    expect((out as unknown as { _tfPointsLen: number })._tfPointsLen).toBe(
+      TF_PRESETS['gray-8bit'].points.length
+    );
   });
 
   it('releaseVolume is a no-op (no exception on unknown handle)', () => {

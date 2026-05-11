@@ -130,6 +130,30 @@
   return result;
 }
 
+- (id)extractVolumeRender:(double)handle
+                 specJson:(NSString *)specJson
+          slabThicknessMm:(double)slabThicknessMm
+                   stepMm:(double)stepMm
+                   tfJson:(NSString *)tfJson
+                  outPath:(NSString *)outPath {
+  NSError *error = nil;
+  NSDictionary *result = [VibeNativeDicomImpl
+      extractVolumeRender:@(handle)
+                 specJson:specJson
+          slabThicknessMm:@(slabThicknessMm)
+                   stepMm:@(stepMm)
+                   tfJson:tfJson
+                  outPath:outPath
+                    error:&error];
+  if (result == nil) {
+    @throw [NSException
+        exceptionWithName:@"VibeNativeDicomError"
+                   reason:error.localizedDescription ?: @"extractVolumeRender failed"
+                 userInfo:nil];
+  }
+  return result;
+}
+
 - (id)extractProjectionSlab:(double)handle
                    specJson:(NSString *)specJson
             slabThicknessMm:(double)slabThicknessMm

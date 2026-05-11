@@ -131,6 +131,25 @@ import Foundation
     return dict as NSDictionary
   }
 
+  @objc public static func extractVolumeRender(
+    _ handle: NSNumber,
+    specJson: NSString,
+    slabThicknessMm: NSNumber,
+    stepMm: NSNumber,
+    tfJson: NSString,
+    outPath: NSString
+  ) throws -> NSDictionary {
+    let dict = try GdcmBridge.extractVolumeRender(
+      fromHandle: handle.doubleValue,
+      specJson: specJson as String,
+      slabThicknessMm: slabThicknessMm.doubleValue,
+      stepMm: stepMm.doubleValue,
+      tfJson: tfJson as String,
+      toPath: outPath as String
+    )
+    return dict as NSDictionary
+  }
+
   @objc public static func writeSyntheticVolumeSeries(
     _ outDir: NSString,
     numberOfSlices: NSNumber,

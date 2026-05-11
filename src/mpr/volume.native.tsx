@@ -7,6 +7,7 @@ import type {
   ProjectionMode,
   ProjectionOptions,
   VolumeInfo,
+  VolumeRenderOptions,
 } from './types';
 
 const PROJECTION_MODE_TO_INT: Record<ProjectionMode, number> = {
@@ -73,6 +74,22 @@ export function extractProjectionSlab(
     opts.slabThicknessMm,
     opts.stepMm ?? 0,
     PROJECTION_MODE_TO_INT[opts.mode],
+    outPath
+  ) as MprSliceInfo;
+}
+
+export function extractVolumeRender(
+  handle: number,
+  spec: ObliqueSpec,
+  opts: VolumeRenderOptions,
+  outPath: string
+): MprSliceInfo {
+  return VibeNativeDicom.extractVolumeRender(
+    handle,
+    JSON.stringify(spec),
+    opts.slabThicknessMm,
+    opts.stepMm ?? 0,
+    JSON.stringify(opts.transferFunction.points),
     outPath
   ) as MprSliceInfo;
 }

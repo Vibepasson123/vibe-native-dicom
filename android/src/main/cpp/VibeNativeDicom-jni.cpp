@@ -671,6 +671,121 @@ jobject sliceInfoToHashMap(JNIEnv* env, const vnd::MprSliceInfo& info) {
 }  // namespace
 
 extern "C" JNIEXPORT jobject JNICALL
+Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeExtractVolumeRender(
+    JNIEnv* env, jobject /* this */, jdouble jHandle, jstring jSpecJson,
+    jdouble jSlabThicknessMm, jdouble jStepMm, jstring jTfJson,
+    jstring jOutPath) {
+  if (jSpecJson == nullptr || jTfJson == nullptr || jOutPath == nullptr) {
+    throwJavaRuntime(env, "extractVolumeRender: null arg");
+    return nullptr;
+  }
+  const char* cSpec = env->GetStringUTFChars(jSpecJson, nullptr);
+  const char* cTf = env->GetStringUTFChars(jTfJson, nullptr);
+  const char* cOut = env->GetStringUTFChars(jOutPath, nullptr);
+  if (cSpec == nullptr || cTf == nullptr || cOut == nullptr) {
+    if (cSpec) env->ReleaseStringUTFChars(jSpecJson, cSpec);
+    if (cTf) env->ReleaseStringUTFChars(jTfJson, cTf);
+    if (cOut) env->ReleaseStringUTFChars(jOutPath, cOut);
+    throwJavaRuntime(env, "extractVolumeRender: bad string encoding");
+    return nullptr;
+  }
+  std::string specJson(cSpec);
+  std::string tfJson(cTf);
+  std::string outPath(cOut);
+  env->ReleaseStringUTFChars(jSpecJson, cSpec);
+  env->ReleaseStringUTFChars(jTfJson, cTf);
+  env->ReleaseStringUTFChars(jOutPath, cOut);
+
+  vnd::ObliqueSpec spec;
+  if (!parseObliqueSpec(specJson, spec)) {
+    throwJavaRuntime(env, "extractVolumeRender: invalid ObliqueSpec JSON");
+    return nullptr;
+  }
+
+  // Parse the TF JSON: array of objects with value/r/g/b/opacity.
+  // Same minimal scanner pattern used elsewhere — no JSON dep.
+  std::vector<vnd::TransferFunctionPoint> tf;
+  {
+    auto skipWs = [](const std::string& s, size_t& i) {
+      while (i < s.size() && (s[i] == ' ' || s[i] == '\t' ||
+                                s[i] == '\n' || s[i] == '\r' || s[i] == '\f'))
+        ++i;
+    };
+    auto readNumber = [&](size_t& i) -> double {
+      skipWs(tfJson, i);
+      size_t start = i;
+      while (i < tfJson.size() &&
+             (tfJson[i] == '-' || tfJson[i] == '+' || tfJson[i] == '.' ||
+              tfJson[i] == 'e' || tfJson[i] == 'E' ||
+              (tfJson[i] >= '0' && tfJson[i] <= '9'))) {
+        ++i;
+      }
+      if (start == i) return 0;
+      try {
+        return std::stod(tfJson.substr(start, i - start));
+      } catch (...) {
+        return 0;
+      }
+    };
+    size_t i = 0;
+    skipWs(tfJson, i);
+    if (i >= tfJson.size() || tfJson[i] != '[') {
+      throwJavaRuntime(env, "extractVolumeRender: tfJson must be a JSON array");
+      return nullptr;
+    }
+    ++i;
+    while (i < tfJson.size()) {
+      skipWs(tfJson, i);
+      if (i < tfJson.size() && tfJson[i] == ']') break;
+      if (i >= tfJson.size() || tfJson[i] != '{') break;
+      ++i;
+      vnd::TransferFunctionPoint pt{};
+      while (i < tfJson.size() && tfJson[i] != '}') {
+        skipWs(tfJson, i);
+        if (i >= tfJson.size() || tfJson[i] != '"') break;
+        ++i;
+        size_t keyStart = i;
+        while (i < tfJson.size() && tfJson[i] != '"') ++i;
+        std::string key = tfJson.substr(keyStart, i - keyStart);
+        if (i < tfJson.size()) ++i;  // closing "
+        skipWs(tfJson, i);
+        if (i < tfJson.size() && tfJson[i] == ':') ++i;
+        const double n = readNumber(i);
+        if (key == "value") pt.value = n;
+        else if (key == "r") pt.r = n;
+        else if (key == "g") pt.g = n;
+        else if (key == "b") pt.b = n;
+        else if (key == "opacity") pt.opacity = n;
+        skipWs(tfJson, i);
+        if (i < tfJson.size() && tfJson[i] == ',') ++i;
+      }
+      if (i < tfJson.size() && tfJson[i] == '}') ++i;
+      tf.push_back(pt);
+      skipWs(tfJson, i);
+      if (i < tfJson.size() && tfJson[i] == ',') ++i;
+    }
+  }
+
+  vnd::MprSliceInfo info;
+  try {
+    info = vnd::extractVolumeRender(static_cast<long long>(jHandle), spec,
+                                     jSlabThicknessMm, jStepMm, tf, outPath);
+  } catch (const std::exception& e) {
+    throwJavaRuntime(env, e.what());
+    return nullptr;
+  }
+  // Use the existing helper but extend with samplesPerPixel.
+  jobject root = sliceInfoToHashMap(env, info);
+  jclass mapCls = env->FindClass("java/util/HashMap");
+  jmethodID putMethod = env->GetMethodID(
+      mapCls, "put",
+      "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+  putInt(env, root, putMethod, "samplesPerPixel", info.samplesPerPixel);
+  env->DeleteLocalRef(mapCls);
+  return root;
+}
+
+extern "C" JNIEXPORT jobject JNICALL
 Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeExtractProjectionSlab(
     JNIEnv* env, jobject /* this */, jdouble jHandle, jstring jSpecJson,
     jdouble jSlabThicknessMm, jdouble jStepMm, jint jMode,

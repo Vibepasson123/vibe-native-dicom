@@ -127,6 +127,27 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
     return Arguments.makeNativeMap(raw)
   }
 
+  override fun extractVolumeRender(
+    handle: Double,
+    specJson: String,
+    slabThicknessMm: Double,
+    stepMm: Double,
+    tfJson: String,
+    outPath: String
+  ): WritableMap {
+    @Suppress("UNCHECKED_CAST")
+    val raw =
+      nativeExtractVolumeRender(
+        handle,
+        specJson,
+        slabThicknessMm,
+        stepMm,
+        tfJson,
+        outPath
+      ) as java.util.HashMap<String, Any?>
+    return Arguments.makeNativeMap(raw)
+  }
+
   override fun writeSyntheticVolumeSeries(
     outDir: String,
     numberOfSlices: Double,
@@ -212,6 +233,14 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
     slabThicknessMm: Double,
     stepMm: Double,
     mode: Int,
+    outPath: String
+  ): Any
+  private external fun nativeExtractVolumeRender(
+    handle: Double,
+    specJson: String,
+    slabThicknessMm: Double,
+    stepMm: Double,
+    tfJson: String,
     outPath: String
   ): Any
   private external fun nativeWriteSyntheticVolumeSeries(

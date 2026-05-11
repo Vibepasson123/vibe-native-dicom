@@ -55,6 +55,10 @@ import {
   // Phase 6.1 — slab projection (MIP / MinIP / Average)
   extractProjectionSlab,
   type ProjectionMode,
+  // Phase 6.2 — volume rendering (TF + alpha compositing)
+  extractVolumeRender,
+  TF_PRESETS,
+  type TfPresetName,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -202,6 +206,11 @@ function App() {
     null
   );
   const [projectionErr, setProjectionErr] = useState<string | null>(null);
+  // Phase 6.2 — volume rendering on the same plane.
+  const [vrPreset, setVrPreset] = useState<TfPresetName>('gray-8bit');
+  const [vrSlabMm, setVrSlabMm] = useState<number>(16);
+  const [vrSlice, setVrSlice] = useState<MprSliceInfo | null>(null);
+  const [vrErr, setVrErr] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -498,6 +507,38 @@ function App() {
     oblique.rotZ,
     projectionMode,
     slabThicknessMm,
+  ]);
+
+  // Phase 6.2 — re-extract the volume render when rotation, preset, or
+  // slab thickness changes. Same plane as Phase 6.1 so the user can
+  // A/B-compare a hard MIP vs a soft TF-composited render live.
+  useEffect(() => {
+    if (!volume || !oblique.spec) return;
+    try {
+      const out = `/tmp/vnd-vr-${volume.handle}-${vrPreset}-${vrSlabMm}-${oblique.rotX.toFixed(3)}-${oblique.rotY.toFixed(3)}-${oblique.rotZ.toFixed(3)}.bin`;
+      setVrSlice(
+        extractVolumeRender(
+          volume.handle,
+          oblique.spec,
+          {
+            slabThicknessMm: vrSlabMm,
+            transferFunction: TF_PRESETS[vrPreset],
+          },
+          out
+        )
+      );
+      setVrErr(null);
+    } catch (err) {
+      setVrErr((err as Error).message);
+    }
+  }, [
+    volume,
+    oblique.spec,
+    oblique.rotX,
+    oblique.rotY,
+    oblique.rotZ,
+    vrPreset,
+    vrSlabMm,
   ]);
 
   const overallPass =
@@ -1148,6 +1189,70 @@ function App() {
             <Text
               style={styles.sliderButton}
               onPress={() => setSlabThicknessMm(slabThicknessMm + 4)}
+            >
+              +
+            </Text>
+          </View>
+        </View>
+      )}
+
+      <Text style={styles.section}>
+        Volume rendering · transfer function (Phase 6.2)
+      </Text>
+      {vrErr && <Text style={styles.fail}>FAIL · {vrErr}</Text>}
+      {!volume && !vrErr && <ActivityIndicator />}
+      {volume && oblique.spec && (
+        <View style={styles.block}>
+          <Text style={styles.label}>
+            Front-to-back alpha-composite a {vrSlabMm} mm slab through the Phase
+            5.3 plane · TF preset {vrPreset}
+          </Text>
+          <View style={styles.viewerWrapper}>
+            {vrSlice && (
+              <DicomImageViewSkia
+                filePath={vrSlice.filePath}
+                rows={vrSlice.rows}
+                columns={vrSlice.columns}
+                bitsAllocated={vrSlice.bitsAllocated}
+                samplesPerPixel={4}
+                photometricInterpretation="MONOCHROME2"
+                windowCenter={128}
+                windowWidth={256}
+                width={192}
+                height={192}
+                enableGestures={false}
+              />
+            )}
+          </View>
+          <Text style={styles.label}>Preset</Text>
+          <View style={styles.sliderRow}>
+            {(
+              ['gray-8bit', 'ct-bone', 'ct-angio', 'mr-brain'] as TfPresetName[]
+            ).map((p) => {
+              const active = p === vrPreset;
+              return (
+                <Text
+                  key={p}
+                  style={[styles.toolButton, active && styles.toolButtonActive]}
+                  onPress={() => setVrPreset(p)}
+                >
+                  {p}
+                </Text>
+              );
+            })}
+          </View>
+          <Text style={styles.label}>Slab thickness</Text>
+          <View style={styles.sliderRow}>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => setVrSlabMm(Math.max(2, vrSlabMm - 4))}
+            >
+              −
+            </Text>
+            <Text style={styles.sliderValue}>{vrSlabMm} mm</Text>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => setVrSlabMm(vrSlabMm + 4)}
             >
               +
             </Text>

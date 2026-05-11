@@ -118,6 +118,9 @@ struct MprSliceInfo {
    *  rendering and for measurements made on reformats. */
   double pixelSpacingRow;
   double pixelSpacingCol;
+  /** Phase 6.2: 1 = grayscale (default), 4 = RGBA8 (volume render
+   *  output — alpha-composited colour, viewer skips W/L). */
+  int samplesPerPixel = 1;
 };
 
 MprSliceInfo extractSlice(long long handle, MprPlane plane, int index,
@@ -188,5 +191,40 @@ MprSliceInfo extractProjectionSlab(long long handle, const ObliqueSpec& spec,
                                    double slabThicknessMm, double stepMm,
                                    ProjectionMode mode,
                                    const std::string& outPath);
+
+// Phase 6.2 — volume rendering with a piecewise-linear transfer
+// function.
+//
+// Each transfer-function control point maps a stored pixel value to
+// an (R, G, B, opacity) tuple, all in [0, 1]. Samples between control
+// points are linearly interpolated. Below the lowest value: zero
+// opacity (fully transparent). Above the highest: clamped to the
+// last point's colour + opacity.
+//
+// The output is alpha-composited RGBA8: walk each ray front-to-back,
+// blend each sample's contribution into the running output, terminate
+// early when opacity saturates.
+struct TransferFunctionPoint {
+  /** Stored pixel value (in input domain — same units as
+   *  windowCenter/windowWidth). */
+  double value;
+  /** R/G/B/opacity in [0, 1]. */
+  double r;
+  double g;
+  double b;
+  double opacity;
+};
+
+// extractVolumeRender uses the same plane spec as MIP. The slab is
+// the integration depth for the ray-cast; thicker slab = more samples
+// per ray = more visible internal structure. tfPoints must be sorted
+// by `value` and contain at least 2 entries.
+//
+// Output: RGBA8 (samplesPerPixel=4) at outPath. The viewer branches
+// on samplesPerPixel to render colour without window/level.
+MprSliceInfo extractVolumeRender(
+    long long handle, const ObliqueSpec& spec, double slabThicknessMm,
+    double stepMm, const std::vector<TransferFunctionPoint>& tfPoints,
+    const std::string& outPath);
 
 }  // namespace vnd

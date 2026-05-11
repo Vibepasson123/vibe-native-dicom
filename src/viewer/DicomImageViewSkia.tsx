@@ -72,18 +72,38 @@ export type DicomImageViewSkiaProps = {
    */
   numberOfFrames?: number;
   frameIndex?: number;
+  /**
+   * Phase 6.2 — when 4, the input file is RGBA8 (volume-render output).
+   * Skip the W/L shader and render the texture as-is. Defaults to 1
+   * (grayscale, W/L applied).
+   */
+  samplesPerPixel?: 1 | 4;
 };
 
 /**
  * 8-bit case: pack stored gray into all RGB channels.
  * 16-bit case: pack low byte → R, high byte → G, B=0, A=255.
  * The shader recombines (R + G*256) and treats as int16/uint16.
+ *
+ * Phase 6.2 RGBA8 case (samplesPerPixel=4): bytes are already in RGBA8
+ * layout — return them unchanged. The W/L shader is bypassed in render.
  */
 function packPixelsToRgba(
   bytes: Uint8Array,
   bitsAllocated: number,
-  numPixels: number
+  numPixels: number,
+  samplesPerPixel: number
 ): Uint8Array {
+  if (samplesPerPixel === 4) {
+    // Already RGBA8 — same layout Skia expects. Truncate / pad
+    // defensively in case the file size doesn't match the declared
+    // dimensions exactly.
+    const expected = numPixels * 4;
+    if (bytes.length === expected) return bytes;
+    const out = new Uint8Array(expected);
+    out.set(bytes.subarray(0, Math.min(bytes.length, expected)));
+    return out;
+  }
   const rgba = new Uint8Array(numPixels * 4);
   if (bitsAllocated <= 8) {
     for (let i = 0; i < numPixels; i++) {
@@ -200,6 +220,7 @@ export function DicomImageViewSkia(props: DicomImageViewSkiaProps) {
     onTransformChange,
     numberOfFrames = 1,
     frameIndex = 0,
+    samplesPerPixel = 1,
   } = props;
 
   const totalFrames = Math.max(1, Math.floor(numberOfFrames));
@@ -259,7 +280,10 @@ export function DicomImageViewSkia(props: DicomImageViewSkiaProps) {
     if (!buffer) return;
     try {
       const numPixels = rows * columns;
-      const bytesPerPixel = bitsAllocated <= 8 ? 1 : 2;
+      // Phase 6.2: RGBA8 inputs are 4 bytes/pixel and have already been
+      // composited; for grayscale we follow the bitsAllocated rule.
+      const bytesPerPixel =
+        samplesPerPixel === 4 ? 4 : bitsAllocated <= 8 ? 1 : 2;
       const frameBytes = numPixels * bytesPerPixel;
 
       // Bounds check: frameIndex outside the buffer means a corrupt or
@@ -274,7 +298,12 @@ export function DicomImageViewSkia(props: DicomImageViewSkiaProps) {
       }
       const slice = buffer.subarray(start, start + frameBytes);
 
-      const rgba = packPixelsToRgba(slice, bitsAllocated, numPixels);
+      const rgba = packPixelsToRgba(
+        slice,
+        bitsAllocated,
+        numPixels,
+        samplesPerPixel
+      );
       const data = Skia.Data.fromBytes(rgba);
       const img = Skia.Image.MakeImage(
         {
@@ -298,6 +327,7 @@ export function DicomImageViewSkia(props: DicomImageViewSkiaProps) {
     rows,
     columns,
     bitsAllocated,
+    samplesPerPixel,
     onError,
   ]);
 
@@ -332,17 +362,30 @@ export function DicomImageViewSkia(props: DicomImageViewSkiaProps) {
     { translateY: -cy },
   ];
 
+  // Phase 6.2: RGBA inputs (volume render) are pre-composited colour —
+  // bypass the W/L shader so the texture is drawn as-is. The plain
+  // <ImageShader> path under <Fill> draws the texture into the rect
+  // exactly the same way the Shader path does, just without the LUT.
+  const isRgba = samplesPerPixel === 4;
   const canvas = (
     <Canvas style={{ width, height }}>
       <Group transform={skiaTransform}>
         <Fill>
-          <Shader source={wlEffect} uniforms={uniforms}>
+          {isRgba ? (
             <ImageShader
               image={skImage}
               fit="contain"
               rect={{ x: 0, y: 0, width, height }}
             />
-          </Shader>
+          ) : (
+            <Shader source={wlEffect} uniforms={uniforms}>
+              <ImageShader
+                image={skImage}
+                fit="contain"
+                rect={{ x: 0, y: 0, width, height }}
+              />
+            </Shader>
+          )}
         </Fill>
       </Group>
     </Canvas>

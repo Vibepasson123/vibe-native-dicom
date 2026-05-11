@@ -72,6 +72,29 @@ export type ProjectionOptions = {
   mode: ProjectionMode;
 };
 
+/**
+ * Phase 6.2 — transfer-function control point. R/G/B/opacity are in
+ * [0, 1]. `value` is in the input domain (same units as window/level).
+ */
+export type TransferFunctionPoint = {
+  value: number;
+  r: number;
+  g: number;
+  b: number;
+  opacity: number;
+};
+
+export type TransferFunction = {
+  /** Sorted by `value` ascending. Must contain ≥ 2 points. */
+  points: TransferFunctionPoint[];
+};
+
+export type VolumeRenderOptions = {
+  slabThicknessMm: number;
+  stepMm?: number;
+  transferFunction: TransferFunction;
+};
+
 export type VolumeInfo = {
   /** Stable handle returned by `buildVolumeFromDicoms`. Pass to slice
    *  extractors and to `releaseVolume`. */
@@ -113,4 +136,7 @@ export type MprSliceInfo = {
    *  applies these to render mm-accurately. */
   pixelSpacingRow: number;
   pixelSpacingCol: number;
+  /** Phase 6.2 — 1 for grayscale (default), 4 for RGBA8 (volume
+   *  render output). Viewer routes to the colour path when 4. */
+  samplesPerPixel?: number;
 };

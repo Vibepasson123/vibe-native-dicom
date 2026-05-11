@@ -888,6 +888,200 @@ MprSliceInfo extractProjectionSlab(long long handle, const ObliqueSpec& spec,
   info.pixelRepresentation = v.pixelRepresentation;
   info.pixelSpacingRow = spec.pixelSpacingMm;
   info.pixelSpacingCol = spec.pixelSpacingMm;
+  info.samplesPerPixel = 1;
+  return info;
+}
+
+// ---- Phase 6.2: volume rendering with transfer function ------------------
+
+namespace {
+
+struct TfRgba {
+  double r;
+  double g;
+  double b;
+  double a;
+};
+
+// Linear interpolation of a transfer-function table. Caller must pass a
+// sorted-by-value `tf` with size >= 2. Below the first point we return
+// fully transparent (caller-supplied colour with a=0); above the last
+// we clamp.
+TfRgba evalTransferFunction(
+    const std::vector<TransferFunctionPoint>& tf, double value) {
+  if (tf.empty()) return {0, 0, 0, 0};
+  if (value <= tf.front().value) {
+    // Below the floor: opacity zero. Below-window samples shouldn't
+    // contribute to the rendered image at all.
+    return {tf.front().r, tf.front().g, tf.front().b, 0.0};
+  }
+  if (value >= tf.back().value) {
+    const auto& p = tf.back();
+    return {p.r, p.g, p.b, p.opacity};
+  }
+  // Binary search the bracket. tf is small (typically <16 points) so
+  // linear scan would be fine, but binary is essentially free.
+  size_t lo = 0;
+  size_t hi = tf.size() - 1;
+  while (hi - lo > 1) {
+    const size_t mid = (lo + hi) / 2;
+    if (tf[mid].value <= value) lo = mid;
+    else hi = mid;
+  }
+  const auto& p0 = tf[lo];
+  const auto& p1 = tf[hi];
+  const double t = (value - p0.value) / (p1.value - p0.value);
+  return {p0.r + t * (p1.r - p0.r), p0.g + t * (p1.g - p0.g),
+          p0.b + t * (p1.b - p0.b),
+          p0.opacity + t * (p1.opacity - p0.opacity)};
+}
+
+}  // namespace
+
+MprSliceInfo extractVolumeRender(
+    long long handle, const ObliqueSpec& spec, double slabThicknessMm,
+    double stepMm, const std::vector<TransferFunctionPoint>& tfPoints,
+    const std::string& outPath) {
+  std::lock_guard<std::mutex> lock(registryMutex());
+  auto it = registry().find(handle);
+  if (it == registry().end()) {
+    throw std::runtime_error(
+        "extractVolumeRender: invalid volume handle");
+  }
+  if (tfPoints.size() < 2) {
+    throw std::runtime_error(
+        "extractVolumeRender: transfer function needs at least 2 points");
+  }
+  // The TF must be sorted by value. Validate rather than assume —
+  // misordered points produce silent garbage.
+  for (size_t i = 1; i < tfPoints.size(); ++i) {
+    if (tfPoints[i].value < tfPoints[i - 1].value) {
+      throw std::runtime_error(
+          "extractVolumeRender: transfer function points must be sorted "
+          "by value");
+    }
+  }
+  const InternalVolume& v = it->second;
+  if (spec.columns <= 0 || spec.rows <= 0) {
+    throw std::runtime_error(
+        "extractVolumeRender: columns and rows must be > 0");
+  }
+  if (spec.pixelSpacingMm <= 0) {
+    throw std::runtime_error(
+        "extractVolumeRender: pixelSpacingMm must be > 0");
+  }
+  if (slabThicknessMm <= 0) {
+    throw std::runtime_error(
+        "extractVolumeRender: slabThicknessMm must be > 0 — VR needs "
+        "real ray length");
+  }
+  const double defaultStep =
+      std::min({v.pixelSpacingCol, v.pixelSpacingRow, v.sliceSpacing});
+  if (stepMm <= 0) stepMm = defaultStep;
+
+  // Plane normal = u × v.
+  const double nx = spec.uMm[1] * spec.vMm[2] - spec.uMm[2] * spec.vMm[1];
+  const double ny = spec.uMm[2] * spec.vMm[0] - spec.uMm[0] * spec.vMm[2];
+  const double nz = spec.uMm[0] * spec.vMm[1] - spec.uMm[1] * spec.vMm[0];
+  const double sx = v.pixelSpacingCol;
+  const double sy = v.pixelSpacingRow;
+  const double sz = v.sliceSpacing;
+
+  const int numSamples =
+      std::max(2, static_cast<int>(std::round(slabThicknessMm / stepMm)) + 1);
+
+  // RGBA8 output — 4 bytes per pixel.
+  const size_t outBytes =
+      static_cast<size_t>(spec.rows) * spec.columns * 4;
+  std::vector<unsigned char> out(outBytes, 0);
+
+  const double halfW = (spec.columns - 1) / 2.0;
+  const double halfH = (spec.rows - 1) / 2.0;
+  const double halfSlab = slabThicknessMm / 2.0;
+
+  // Opacity correction for variable step size: the reference TF assumes
+  // a step equal to the median voxel spacing. If we step further, each
+  // sample should look "more solid"; if shorter, more transparent.
+  // alpha_corrected = 1 - (1 - alpha)^(stepMm / refStepMm).
+  const double refStep = defaultStep;
+  const double opacityExponent = (refStep > 0) ? (stepMm / refStep) : 1.0;
+
+  for (int j = 0; j < spec.rows; ++j) {
+    for (int i = 0; i < spec.columns; ++i) {
+      const double du = (i - halfW) * spec.pixelSpacingMm;
+      const double dv = (j - halfH) * spec.pixelSpacingMm;
+      const double basePx =
+          spec.centerMm[0] + du * spec.uMm[0] + dv * spec.vMm[0];
+      const double basePy =
+          spec.centerMm[1] + du * spec.uMm[1] + dv * spec.vMm[1];
+      const double basePz =
+          spec.centerMm[2] + du * spec.uMm[2] + dv * spec.vMm[2];
+
+      // Front-to-back compositing.
+      double accR = 0;
+      double accG = 0;
+      double accB = 0;
+      double accA = 0;
+      for (int k = 0; k < numSamples; ++k) {
+        const double t =
+            -halfSlab + (k * 2.0 * halfSlab) / (numSamples - 1);
+        const double wx = basePx + t * nx;
+        const double wy = basePy + t * ny;
+        const double wz = basePz + t * nz;
+        const double sample = trilinearSample(v, wx / sx, wy / sy, wz / sz);
+        TfRgba c = evalTransferFunction(tfPoints, sample);
+        // Step-corrected alpha.
+        if (opacityExponent != 1.0 && c.a > 0 && c.a < 1) {
+          c.a = 1.0 - std::pow(1.0 - c.a, opacityExponent);
+        }
+        // Front-to-back blend: out += (1 - acc_a) * (a * colour).
+        const double w = (1.0 - accA) * c.a;
+        accR += w * c.r;
+        accG += w * c.g;
+        accB += w * c.b;
+        accA += w;
+        if (accA > 0.99) break;  // early termination
+      }
+      // Pre-multiplied alpha → convert to straight RGBA8 (Skia
+      // ImageInfo we use is alphaType=Opaque on the 1-channel path,
+      // for RGBA output we composite on black so the alpha can be 1).
+      // Here we produce pre-multiplied output where the background is
+      // black; the viewer treats it as opaque.
+      unsigned char* dst = out.data() + (j * spec.columns + i) * 4;
+      dst[0] = static_cast<unsigned char>(
+          std::min(255, std::max(0, static_cast<int>(std::round(accR * 255)))));
+      dst[1] = static_cast<unsigned char>(
+          std::min(255, std::max(0, static_cast<int>(std::round(accG * 255)))));
+      dst[2] = static_cast<unsigned char>(
+          std::min(255, std::max(0, static_cast<int>(std::round(accB * 255)))));
+      dst[3] = 255;  // opaque (background visible only where rays didn't accumulate)
+    }
+  }
+
+  std::FILE* fp = std::fopen(outPath.c_str(), "wb");
+  if (!fp) {
+    throw std::runtime_error(
+        std::string("extractVolumeRender: cannot open ") + outPath);
+  }
+  const size_t written = std::fwrite(out.data(), 1, out.size(), fp);
+  std::fclose(fp);
+  if (written != out.size()) {
+    throw std::runtime_error(
+        std::string("extractVolumeRender: short write to ") + outPath);
+  }
+
+  MprSliceInfo info;
+  info.filePath = outPath;
+  info.byteLength = static_cast<long long>(out.size());
+  info.rows = spec.rows;
+  info.columns = spec.columns;
+  // RGBA8 outputs always 8 bits per channel — bitsAllocated=8 lets the
+  // viewer's existing 8-bit path handle the texture upload.
+  info.bitsAllocated = 8;
+  info.pixelRepresentation = 0;
+  info.pixelSpacingRow = spec.pixelSpacingMm;
+  info.pixelSpacingCol = spec.pixelSpacingMm;
+  info.samplesPerPixel = 4;
   return info;
 }
 

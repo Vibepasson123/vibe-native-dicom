@@ -141,6 +141,20 @@ export interface Spec extends TurboModule {
     mode: number,
     outPath: string
   ): Object;
+
+  // Phase 6.2 — full volume rendering with a piecewise-linear transfer
+  // function. tfJson is a JSON-encoded array of TransferFunctionPoint
+  // objects (sorted by `value`). Output is RGBA8 — caller must check
+  // MprSliceInfo.samplesPerPixel === 4 and route to the colour viewer
+  // path.
+  extractVolumeRender(
+    handle: number,
+    specJson: string,
+    slabThicknessMm: number,
+    stepMm: number,
+    tfJson: string,
+    outPath: string
+  ): Object;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('VibeNativeDicom');

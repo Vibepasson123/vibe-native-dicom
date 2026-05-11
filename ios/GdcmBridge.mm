@@ -291,6 +291,90 @@ static NSDictionary *datasetToDictionary(const vnd::DicomDataset &ds) {
   vnd::releaseVolume(static_cast<long long>(handle));
 }
 
++ (nullable NSDictionary *)extractVolumeRenderFromHandle:(double)handle
+                                                  specJson:(NSString *)specJson
+                                           slabThicknessMm:(double)slabThicknessMm
+                                                    stepMm:(double)stepMm
+                                                    tfJson:(NSString *)tfJson
+                                                    toPath:(NSString *)outPath
+                                                     error:(NSError **)error {
+  NSData *specData = [specJson dataUsingEncoding:NSUTF8StringEncoding];
+  NSError *jsonErr = nil;
+  id parsedSpec = [NSJSONSerialization JSONObjectWithData:specData
+                                                  options:0
+                                                    error:&jsonErr];
+  if (jsonErr || ![parsedSpec isKindOfClass:[NSDictionary class]]) {
+    if (error)
+      *error = makeError(
+          std::string("extractVolumeRender: specJson must be a JSON object"));
+    return nil;
+  }
+  NSDictionary *dict = (NSDictionary *)parsedSpec;
+  auto readVec = [&](NSString *key, double out[3]) -> bool {
+    NSArray *arr = dict[key];
+    if (![arr isKindOfClass:[NSArray class]] || arr.count < 3) return false;
+    out[0] = [arr[0] doubleValue];
+    out[1] = [arr[1] doubleValue];
+    out[2] = [arr[2] doubleValue];
+    return true;
+  };
+  vnd::ObliqueSpec spec;
+  if (!readVec(@"centerMm", spec.centerMm) ||
+      !readVec(@"uMm", spec.uMm) || !readVec(@"vMm", spec.vMm)) {
+    if (error)
+      *error = makeError(
+          std::string("extractVolumeRender: missing centerMm/uMm/vMm"));
+    return nil;
+  }
+  spec.columns = [dict[@"columns"] intValue];
+  spec.rows = [dict[@"rows"] intValue];
+  spec.pixelSpacingMm = [dict[@"pixelSpacingMm"] doubleValue];
+
+  NSData *tfData = [tfJson dataUsingEncoding:NSUTF8StringEncoding];
+  id parsedTf = [NSJSONSerialization JSONObjectWithData:tfData
+                                                options:0
+                                                  error:&jsonErr];
+  if (jsonErr || ![parsedTf isKindOfClass:[NSArray class]]) {
+    if (error)
+      *error = makeError(
+          std::string("extractVolumeRender: tfJson must be a JSON array"));
+    return nil;
+  }
+  std::vector<vnd::TransferFunctionPoint> tf;
+  for (id entry in (NSArray *)parsedTf) {
+    if (![entry isKindOfClass:[NSDictionary class]]) continue;
+    NSDictionary *p = (NSDictionary *)entry;
+    vnd::TransferFunctionPoint pt;
+    pt.value = [p[@"value"] doubleValue];
+    pt.r = [p[@"r"] doubleValue];
+    pt.g = [p[@"g"] doubleValue];
+    pt.b = [p[@"b"] doubleValue];
+    pt.opacity = [p[@"opacity"] doubleValue];
+    tf.push_back(pt);
+  }
+
+  vnd::MprSliceInfo info;
+  try {
+    info = vnd::extractVolumeRender(static_cast<long long>(handle), spec,
+                                     slabThicknessMm, stepMm, tf,
+                                     std::string([outPath UTF8String]));
+  } catch (const std::exception &e) {
+    if (error) *error = makeError(e.what());
+    return nil;
+  }
+  return @{
+    @"filePath": [NSString stringWithUTF8String:info.filePath.c_str()],
+    @"byteLength": @(static_cast<double>(info.byteLength)),
+    @"rows": @(info.rows),
+    @"columns": @(info.columns),
+    @"bitsAllocated": @(info.bitsAllocated),
+    @"pixelRepresentation": @(info.pixelRepresentation),
+    @"pixelSpacingRow": @(info.pixelSpacingRow),
+    @"pixelSpacingCol": @(info.pixelSpacingCol),
+    @"samplesPerPixel": @(info.samplesPerPixel),
+  };
+}
+
 + (nullable NSDictionary *)extractProjectionSlabFromHandle:(double)handle
                                                    specJson:(NSString *)specJson
                                             slabThicknessMm:(double)slabThicknessMm

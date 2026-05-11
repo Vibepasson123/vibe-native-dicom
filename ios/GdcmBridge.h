@@ -107,6 +107,17 @@ NS_ASSUME_NONNULL_BEGIN
                                                      toPath:(NSString *)outPath
                                                       error:(NSError **)error;
 
+// Phase 6.2 — full volume rendering with transfer function. tfJson is
+// a JSON-encoded array of TransferFunctionPoint objects (sorted by
+// `value`). Output is RGBA8.
++ (nullable NSDictionary *)extractVolumeRenderFromHandle:(double)handle
+                                                  specJson:(NSString *)specJson
+                                           slabThicknessMm:(double)slabThicknessMm
+                                                    stepMm:(double)stepMm
+                                                    tfJson:(NSString *)tfJson
+                                                    toPath:(NSString *)outPath
+                                                     error:(NSError **)error;
+
 // Phase 5.1 — write a synthetic volume series; returns a JSON-encoded
 // array of slice paths. Phase 5.2 options: transferSyntaxUID + gappedZ.
 + (nullable NSString *)writeSyntheticVolumeSeriesAtDir:(NSString *)outDir

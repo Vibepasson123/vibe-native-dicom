@@ -7,6 +7,7 @@ import type {
   ObliqueSpec,
   ProjectionOptions,
   VolumeInfo,
+  VolumeRenderOptions,
 } from './types';
 
 export function buildVolumeFromDicoms(
@@ -49,6 +50,17 @@ export function extractProjectionSlab(
   _handle: number,
   _spec: ObliqueSpec,
   _opts: ProjectionOptions,
+  _outPath: string
+): MprSliceInfo {
+  throw new Error(
+    "'@viveksah/vibe-native-dicom' is only supported on native platforms."
+  );
+}
+
+export function extractVolumeRender(
+  _handle: number,
+  _spec: ObliqueSpec,
+  _opts: VolumeRenderOptions,
   _outPath: string
 ): MprSliceInfo {
   throw new Error(
