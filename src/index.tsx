@@ -28,6 +28,12 @@ export {
   type SyncedViewerSlot,
   type UseSyncedViewerGroupOptions,
   type UseSyncedViewerGroupResult,
+  // Phase 7.2 — fusion overlay
+  DicomFusionViewSkia,
+  type DicomFusionViewSkiaProps,
+  type FusionChannel,
+  buildColormapLut,
+  type ColormapName,
   applyWindowLevel,
   type WindowLevelInput,
   bytesFromLatin1,

@@ -65,6 +65,9 @@ import {
   type VolumeRenderPresetName,
   // Phase 7.1 — synced side-by-side viewers
   useSyncedViewerGroup,
+  // Phase 7.2 — fusion overlay
+  DicomFusionViewSkia,
+  type ColormapName,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -240,6 +243,12 @@ function App() {
   const vr = useVolumeRenderController(volume, {
     initialPreset: 'gray-8bit-3d',
   });
+  // Phase 7.2 — fusion overlay state. The synthetic dataset only has
+  // one channel, so the overlay reuses the same file with a different
+  // W/L to highlight the bright half of the gradient — this validates
+  // the dual-texture composite without needing a second study.
+  const [fusionOpacity, setFusionOpacity] = useState<number>(0.5);
+  const [fusionColormap, setFusionColormap] = useState<ColormapName>('hot');
   // Phase 7.1 — two synced viewers showing the same pixel buffer.
   // In a real workflow the two filePaths would come from different
   // studies (prior vs. current). Here they share to validate the
@@ -1548,6 +1557,76 @@ function App() {
           </>
         )}
       </View>
+
+      <Text style={styles.section}>Fusion overlay (Phase 7.2)</Text>
+      {perf?.info.hasPixelData ? (
+        <View style={styles.block}>
+          <Text style={styles.label}>
+            Same buffer twice: base in MONOCHROME2 W/L, overlay W/L tuned to
+            highlight the bright half of the gradient and run through a
+            colormap.
+          </Text>
+          <View style={styles.viewerWrapper}>
+            <DicomFusionViewSkia
+              base={{
+                filePath: perf.info.filePath,
+                rows: perf.info.rows,
+                columns: perf.info.columns,
+                bitsAllocated: perf.info.bitsAllocated,
+                windowCenter: 128,
+                windowWidth: 256,
+              }}
+              overlay={{
+                filePath: perf.info.filePath,
+                rows: perf.info.rows,
+                columns: perf.info.columns,
+                bitsAllocated: perf.info.bitsAllocated,
+                windowCenter: 200,
+                windowWidth: 80,
+              }}
+              overlayOpacity={fusionOpacity}
+              overlayColormap={fusionColormap}
+              width={192}
+              height={192}
+            />
+          </View>
+          <Text style={styles.label}>Colormap</Text>
+          <View style={styles.sliderRow}>
+            {(['hot', 'jet', 'gray'] as ColormapName[]).map((cm) => {
+              const active = cm === fusionColormap;
+              return (
+                <Text
+                  key={cm}
+                  style={[styles.toolButton, active && styles.toolButtonActive]}
+                  onPress={() => setFusionColormap(cm)}
+                >
+                  {cm}
+                </Text>
+              );
+            })}
+          </View>
+          <Text style={styles.label}>Overlay opacity</Text>
+          <View style={styles.sliderRow}>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => setFusionOpacity(Math.max(0, fusionOpacity - 0.1))}
+            >
+              −
+            </Text>
+            <Text style={styles.sliderValue}>
+              {Math.round(fusionOpacity * 100)}%
+            </Text>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => setFusionOpacity(Math.min(1, fusionOpacity + 0.1))}
+            >
+              +
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <Text style={styles.label}>Waiting for pixel data…</Text>
+      )}
 
       <Text style={styles.section}>
         Side-by-side synced viewers (Phase 7.1)

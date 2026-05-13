@@ -31,6 +31,21 @@ export {
   type UseSyncedViewerGroupOptions,
   type UseSyncedViewerGroupResult,
 } from './useSyncedViewerGroup';
+// Phase 7.2 — fusion overlay viewer (CT base + PET-style overlay).
+// Imports @shopify/react-native-skia (optional peer dep). Same lazy
+// loading story as DicomImageViewSkia.
+export {
+  DicomFusionViewSkia,
+  type DicomFusionViewSkiaProps,
+  type FusionChannel,
+} from './DicomFusionViewSkia';
+export {
+  buildColormapLut,
+  hot,
+  jet,
+  gray,
+  type ColormapName,
+} from './colormaps';
 export {
   applyWindowLevel,
   bytesFromLatin1,
