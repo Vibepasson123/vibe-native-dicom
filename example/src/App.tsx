@@ -63,6 +63,8 @@ import {
   useVolumeRenderController,
   VOLUME_RENDER_PRESETS,
   type VolumeRenderPresetName,
+  // Phase 7.1 — synced side-by-side viewers
+  useSyncedViewerGroup,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -237,6 +239,18 @@ function App() {
   // app continues to exercise the low-level API in the same session.
   const vr = useVolumeRenderController(volume, {
     initialPreset: 'gray-8bit-3d',
+  });
+  // Phase 7.1 — two synced viewers showing the same pixel buffer.
+  // In a real workflow the two filePaths would come from different
+  // studies (prior vs. current). Here they share to validate the
+  // shared-state mechanics — when sync is ON both viewers tick
+  // together; when OFF each side independently.
+  const synced = useSyncedViewerGroup({
+    count: 2,
+    initial: [
+      { windowCenter: 128, windowWidth: 256 },
+      { windowCenter: 128, windowWidth: 256 },
+    ],
   });
 
   useEffect(() => {
@@ -1535,6 +1549,79 @@ function App() {
         )}
       </View>
 
+      <Text style={styles.section}>
+        Side-by-side synced viewers (Phase 7.1)
+      </Text>
+      {perf?.info.hasPixelData ? (
+        <View style={styles.block}>
+          <Text style={styles.label}>
+            Two viewers driven by useSyncedViewerGroup. Tap an axis to break
+            sync — both panes go independent on that axis only.
+          </Text>
+          <View style={styles.sliderRow}>
+            {(['wl', 'transform', 'frame'] as const).map((key) => {
+              const active = synced.axes[key];
+              return (
+                <Text
+                  key={key}
+                  style={[styles.toolButton, active && styles.toolButtonActive]}
+                  onPress={() =>
+                    synced.setAxes({ ...synced.axes, [key]: !active })
+                  }
+                >
+                  {key} {active ? 'SYNC' : 'INDEP'}
+                </Text>
+              );
+            })}
+          </View>
+          <View style={styles.syncedRow}>
+            {synced.slots.map((slot, i) => (
+              <View key={i} style={styles.syncedSlot}>
+                <Text style={styles.label}>
+                  Slot {i} · WC {slot.windowCenter} / WW {slot.windowWidth}
+                </Text>
+                <DicomImageViewSkia
+                  filePath={perf.info.filePath}
+                  rows={perf.info.rows}
+                  columns={perf.info.columns}
+                  bitsAllocated={perf.info.bitsAllocated}
+                  photometricInterpretation={
+                    perf.info.photometricInterpretation
+                  }
+                  windowCenter={slot.windowCenter}
+                  windowWidth={slot.windowWidth}
+                  width={160}
+                  height={160}
+                  onTransformChange={slot.onTransformChange}
+                />
+                <View style={styles.sliderRow}>
+                  <Text
+                    style={styles.sliderButton}
+                    onPress={() =>
+                      slot.setWindowCenter(Math.max(0, slot.windowCenter - 16))
+                    }
+                  >
+                    WC −
+                  </Text>
+                  <Text
+                    style={styles.sliderButton}
+                    onPress={() =>
+                      slot.setWindowCenter(
+                        Math.min(255, slot.windowCenter + 16)
+                      )
+                    }
+                  >
+                    WC +
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : (
+        <Text style={styles.label}>Waiting for pixel data…</Text>
+      )}
+
       <Text style={styles.section}>Overall</Text>
       <Text style={overallPass ? styles.passLarge : styles.failLarge}>
         {overallPass ? 'PASS' : 'FAIL'}
@@ -1612,6 +1699,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
     marginTop: 4,
+  },
+  syncedRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  syncedSlot: {
+    flex: 1,
   },
   sliderButton: {
     fontSize: 22,

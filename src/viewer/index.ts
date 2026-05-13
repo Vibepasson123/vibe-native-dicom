@@ -21,6 +21,16 @@ export {
   type FrameSequenceOptions,
   type FrameSequenceState,
 } from './useFrameSequence';
+// Phase 7.1 — synced side-by-side viewer group (comparison workflow).
+export {
+  useSyncedViewerGroup,
+  pickSlotValue,
+  type SyncedViewerAxes,
+  type SyncedViewerInitialState,
+  type SyncedViewerSlot,
+  type UseSyncedViewerGroupOptions,
+  type UseSyncedViewerGroupResult,
+} from './useSyncedViewerGroup';
 export {
   applyWindowLevel,
   bytesFromLatin1,
