@@ -34,6 +34,13 @@ export {
   type FusionChannel,
   buildColormapLut,
   type ColormapName,
+  // Phase 7.3 — SEG label-map overlay
+  DicomSegmentationOverlay,
+  type DicomSegmentationOverlayProps,
+  type SegmentationBaseChannel,
+  buildSegmentPalette,
+  makeSyntheticDiscLabelMap,
+  type Segment,
   applyWindowLevel,
   type WindowLevelInput,
   bytesFromLatin1,

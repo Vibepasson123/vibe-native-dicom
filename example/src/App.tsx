@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Text,
   View,
@@ -68,6 +68,10 @@ import {
   // Phase 7.2 — fusion overlay
   DicomFusionViewSkia,
   type ColormapName,
+  // Phase 7.3 — SEG label-map overlay
+  DicomSegmentationOverlay,
+  makeSyntheticDiscLabelMap,
+  type Segment,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -249,6 +253,23 @@ function App() {
   // the dual-texture composite without needing a second study.
   const [fusionOpacity, setFusionOpacity] = useState<number>(0.5);
   const [fusionColormap, setFusionColormap] = useState<ColormapName>('hot');
+  // Phase 7.3 — SEG label-map overlay state. We synthesise a single
+  // disc-shaped segment at the centre of the gradient image; the
+  // shader colourises it red with the user-chosen opacity.
+  const [segOpacity, setSegOpacity] = useState<number>(0.5);
+  const segLabelMap = useMemo(
+    () =>
+      perf?.info
+        ? makeSyntheticDiscLabelMap(perf.info.rows, perf.info.columns, 1, 0.3)
+        : null,
+    [perf?.info]
+  );
+  const segPalette: Segment[] = useMemo(
+    () => [
+      { id: 1, label: 'lesion (synthetic)', r: 1, g: 0.2, b: 0.2, opacity: 1 },
+    ],
+    []
+  );
   // Phase 7.1 — two synced viewers showing the same pixel buffer.
   // In a real workflow the two filePaths would come from different
   // studies (prior vs. current). Here they share to validate the
@@ -1557,6 +1578,53 @@ function App() {
           </>
         )}
       </View>
+
+      <Text style={styles.section}>Segmentation overlay (Phase 7.3)</Text>
+      {perf?.info.hasPixelData && segLabelMap ? (
+        <View style={styles.block}>
+          <Text style={styles.label}>
+            Synthetic disc label-map painted with one red segment over the
+            gradient base. Opacity slider drives the global overlay alpha.
+          </Text>
+          <View style={styles.viewerWrapper}>
+            <DicomSegmentationOverlay
+              base={{
+                filePath: perf.info.filePath,
+                rows: perf.info.rows,
+                columns: perf.info.columns,
+                bitsAllocated: perf.info.bitsAllocated,
+                windowCenter: 128,
+                windowWidth: 256,
+              }}
+              labelMap={segLabelMap}
+              segments={segPalette}
+              overlayOpacity={segOpacity}
+              width={192}
+              height={192}
+            />
+          </View>
+          <Text style={styles.label}>Overlay opacity</Text>
+          <View style={styles.sliderRow}>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => setSegOpacity(Math.max(0, segOpacity - 0.1))}
+            >
+              −
+            </Text>
+            <Text style={styles.sliderValue}>
+              {Math.round(segOpacity * 100)}%
+            </Text>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => setSegOpacity(Math.min(1, segOpacity + 0.1))}
+            >
+              +
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <Text style={styles.label}>Waiting for pixel data…</Text>
+      )}
 
       <Text style={styles.section}>Fusion overlay (Phase 7.2)</Text>
       {perf?.info.hasPixelData ? (

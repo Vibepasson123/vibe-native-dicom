@@ -46,6 +46,17 @@ export {
   gray,
   type ColormapName,
 } from './colormaps';
+// Phase 7.3 — DICOM SEG-style label-map overlay.
+export {
+  DicomSegmentationOverlay,
+  type DicomSegmentationOverlayProps,
+  type SegmentationBaseChannel,
+} from './DicomSegmentationOverlay';
+export {
+  buildSegmentPalette,
+  makeSyntheticDiscLabelMap,
+  type Segment,
+} from './segmentation';
 export {
   applyWindowLevel,
   bytesFromLatin1,
