@@ -41,3 +41,19 @@ export {
   buildObliqueSpec,
   type ObliqueController,
 } from './useObliqueController';
+export {
+  CT_BONE_3D,
+  CT_ANGIO_3D,
+  MR_BRAIN_3D,
+  GRAY_8BIT_3D,
+  VOLUME_RENDER_PRESETS,
+  presetToVolumeRenderOptions,
+  type VolumeRenderPreset,
+  type VolumeRenderPresetName,
+} from './volumeRenderPresets';
+export {
+  useVolumeRenderController,
+  type UseVolumeRenderControllerOptions,
+  type UseVolumeRenderControllerResult,
+  type VolumeRenderOutPathBuilder,
+} from './useVolumeRenderController';

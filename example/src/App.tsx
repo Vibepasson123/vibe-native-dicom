@@ -59,6 +59,10 @@ import {
   extractVolumeRender,
   TF_PRESETS,
   type TfPresetName,
+  // Phase 6.5 — 3D presets + controller
+  useVolumeRenderController,
+  VOLUME_RENDER_PRESETS,
+  type VolumeRenderPresetName,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -226,6 +230,14 @@ function App() {
   const [vrLightEnabled, setVrLightEnabled] = useState<boolean>(false);
   const [vrLightStrength, setVrLightStrength] =
     useState<VrLightStrength>('medium');
+
+  // Phase 6.5 — high-level controller driving its own VR panel.
+  // Replaces ~30 lines of manual sliders with one hook call. Note
+  // that the Phase 6.2–6.4 manual panel above stays in place so the
+  // app continues to exercise the low-level API in the same session.
+  const vr = useVolumeRenderController(volume, {
+    initialPreset: 'gray-8bit-3d',
+  });
 
   useEffect(() => {
     try {
@@ -1356,6 +1368,105 @@ function App() {
                 </Text>
               );
             })}
+          </View>
+        </View>
+      )}
+
+      <Text style={styles.section}>
+        Volume rendering · preset controller (Phase 6.5)
+      </Text>
+      {vr.error && <Text style={styles.fail}>FAIL · {vr.error.message}</Text>}
+      {!volume && !vr.error && <ActivityIndicator />}
+      {volume && (
+        <View style={styles.block}>
+          <Text style={styles.label}>
+            One hook owns preset + rotation + clip; sliders shrink to a preset
+            picker. Currently: {VOLUME_RENDER_PRESETS[vr.preset].label}
+          </Text>
+          <View style={styles.viewerWrapper}>
+            {vr.slice && (
+              <DicomImageViewSkia
+                filePath={vr.slice.filePath}
+                rows={vr.slice.rows}
+                columns={vr.slice.columns}
+                bitsAllocated={vr.slice.bitsAllocated}
+                samplesPerPixel={4}
+                photometricInterpretation="MONOCHROME2"
+                windowCenter={128}
+                windowWidth={256}
+                width={192}
+                height={192}
+                enableGestures={false}
+              />
+            )}
+          </View>
+          <Text style={styles.label}>Preset</Text>
+          <View style={styles.sliderRow}>
+            {(
+              [
+                'gray-8bit-3d',
+                'ct-bone-3d',
+                'ct-angio-3d',
+                'mr-brain-3d',
+              ] as VolumeRenderPresetName[]
+            ).map((p) => {
+              const active = p === vr.preset;
+              return (
+                <Text
+                  key={p}
+                  style={[styles.toolButton, active && styles.toolButtonActive]}
+                  onPress={() => vr.setPreset(p)}
+                >
+                  {p.replace('-3d', '')}
+                </Text>
+              );
+            })}
+          </View>
+          <Text style={styles.label}>Rotate Y (controller-owned)</Text>
+          <View style={styles.sliderRow}>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => vr.setRotY(vr.rotY - Math.PI / 12)}
+            >
+              Y−
+            </Text>
+            <Text style={styles.sliderValue}>
+              {((vr.rotY * 180) / Math.PI).toFixed(0)}°
+            </Text>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => vr.setRotY(vr.rotY + Math.PI / 12)}
+            >
+              Y+
+            </Text>
+            <Text style={styles.sliderButton} onPress={vr.resetRotation}>
+              Reset
+            </Text>
+          </View>
+          <Text style={styles.label}>Clip (Z half-space)</Text>
+          <View style={styles.sliderRow}>
+            <Text
+              style={[
+                styles.toolButton,
+                vr.clipEnabled && styles.toolButtonActive,
+              ]}
+              onPress={() => vr.setClipEnabled(!vr.clipEnabled)}
+            >
+              {vr.clipEnabled ? 'CLIP ON' : 'CLIP OFF'}
+            </Text>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => vr.setClipZMm(Math.max(0, vr.clipZMm - 1))}
+            >
+              −
+            </Text>
+            <Text style={styles.sliderValue}>z ≥ {vr.clipZMm} mm</Text>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => vr.setClipZMm(Math.min(15, vr.clipZMm + 1))}
+            >
+              +
+            </Text>
           </View>
         </View>
       )}
