@@ -84,12 +84,20 @@ export function extractVolumeRender(
   opts: VolumeRenderOptions,
   outPath: string
 ): MprSliceInfo {
+  // Phase 6.3: serialise clipPlanes when present; empty string when
+  // absent so the bridge can early-exit. We intentionally always pass
+  // a string (not nullable) to keep the bridge types simple.
+  const clipJson =
+    opts.clipPlanes && opts.clipPlanes.length > 0
+      ? JSON.stringify(opts.clipPlanes)
+      : '';
   return VibeNativeDicom.extractVolumeRender(
     handle,
     JSON.stringify(spec),
     opts.slabThicknessMm,
     opts.stepMm ?? 0,
     JSON.stringify(opts.transferFunction.points),
+    clipJson,
     outPath
   ) as MprSliceInfo;
 }

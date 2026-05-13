@@ -89,10 +89,27 @@ export type TransferFunction = {
   points: TransferFunctionPoint[];
 };
 
+/**
+ * Phase 6.3 — clip plane. A clip plane defines a half-space in volume
+ * mm-coords; samples on the negative side ((p − pointMm) · normalMm < 0)
+ * are discarded by the ray loop. Multiple planes are AND-ed — pass
+ * several to carve a convex region.
+ *
+ * `normalMm` is typically a unit vector but does not have to be — only
+ * the sign of the dot product matters. `pointMm` is any point on the
+ * plane.
+ */
+export type ClipPlane = {
+  pointMm: [number, number, number];
+  normalMm: [number, number, number];
+};
+
 export type VolumeRenderOptions = {
   slabThicknessMm: number;
   stepMm?: number;
   transferFunction: TransferFunction;
+  /** Phase 6.3 — optional half-space clips applied to every ray sample. */
+  clipPlanes?: ClipPlane[];
 };
 
 export type VolumeInfo = {

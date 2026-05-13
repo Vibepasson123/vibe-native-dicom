@@ -72,6 +72,7 @@ export {
   rescaleTransferFunction,
   type TfPresetName,
   type BuildVolumeOptions,
+  type ClipPlane,
   type SyntheticVolumeSeriesOptions,
   type MprPlane,
   type MprSliceInfo,

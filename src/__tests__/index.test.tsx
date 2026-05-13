@@ -195,6 +195,7 @@ jest.mock('../NativeVibeNativeDicom', () => {
         _slabThicknessMm: number,
         _stepMm: number,
         _tfJson: string,
+        _clipPlanesJson: string,
         outPath: string
       ) => ({
         filePath: outPath,

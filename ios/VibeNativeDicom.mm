@@ -135,6 +135,7 @@
           slabThicknessMm:(double)slabThicknessMm
                    stepMm:(double)stepMm
                    tfJson:(NSString *)tfJson
+           clipPlanesJson:(NSString *)clipPlanesJson
                   outPath:(NSString *)outPath {
   NSError *error = nil;
   NSDictionary *result = [VibeNativeDicomImpl
@@ -143,6 +144,7 @@
           slabThicknessMm:@(slabThicknessMm)
                    stepMm:@(stepMm)
                    tfJson:tfJson
+           clipPlanesJson:clipPlanesJson
                   outPath:outPath
                     error:&error];
   if (result == nil) {

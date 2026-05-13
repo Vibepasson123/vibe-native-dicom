@@ -674,7 +674,7 @@ extern "C" JNIEXPORT jobject JNICALL
 Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeExtractVolumeRender(
     JNIEnv* env, jobject /* this */, jdouble jHandle, jstring jSpecJson,
     jdouble jSlabThicknessMm, jdouble jStepMm, jstring jTfJson,
-    jstring jOutPath) {
+    jstring jClipPlanesJson, jstring jOutPath) {
   if (jSpecJson == nullptr || jTfJson == nullptr || jOutPath == nullptr) {
     throwJavaRuntime(env, "extractVolumeRender: null arg");
     return nullptr;
@@ -682,19 +682,27 @@ Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeExtractVolumeRende
   const char* cSpec = env->GetStringUTFChars(jSpecJson, nullptr);
   const char* cTf = env->GetStringUTFChars(jTfJson, nullptr);
   const char* cOut = env->GetStringUTFChars(jOutPath, nullptr);
+  // clipPlanesJson is allowed to be null (= no planes).
+  const char* cClip =
+      (jClipPlanesJson != nullptr)
+          ? env->GetStringUTFChars(jClipPlanesJson, nullptr)
+          : nullptr;
   if (cSpec == nullptr || cTf == nullptr || cOut == nullptr) {
     if (cSpec) env->ReleaseStringUTFChars(jSpecJson, cSpec);
     if (cTf) env->ReleaseStringUTFChars(jTfJson, cTf);
     if (cOut) env->ReleaseStringUTFChars(jOutPath, cOut);
+    if (cClip) env->ReleaseStringUTFChars(jClipPlanesJson, cClip);
     throwJavaRuntime(env, "extractVolumeRender: bad string encoding");
     return nullptr;
   }
   std::string specJson(cSpec);
   std::string tfJson(cTf);
+  std::string clipJson(cClip ? cClip : "");
   std::string outPath(cOut);
   env->ReleaseStringUTFChars(jSpecJson, cSpec);
   env->ReleaseStringUTFChars(jTfJson, cTf);
   env->ReleaseStringUTFChars(jOutPath, cOut);
+  if (cClip) env->ReleaseStringUTFChars(jClipPlanesJson, cClip);
 
   vnd::ObliqueSpec spec;
   if (!parseObliqueSpec(specJson, spec)) {
@@ -766,10 +774,90 @@ Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeExtractVolumeRende
     }
   }
 
+  // Phase 6.3: parse the clip-planes JSON. Shape:
+  //   [{"pointMm":[x,y,z],"normalMm":[x,y,z]}, ...]
+  // Empty / missing → no planes. Same hand-rolled scanner pattern as
+  // the TF parser above. Invalid JSON is treated as "no planes" rather
+  // than thrown — the worst outcome is a non-clipped render.
+  std::vector<vnd::ClipPlane> clipPlanes;
+  if (!clipJson.empty()) {
+    auto skipWs = [](const std::string& s, size_t& i) {
+      while (i < s.size() && (s[i] == ' ' || s[i] == '\t' ||
+                                s[i] == '\n' || s[i] == '\r' || s[i] == '\f'))
+        ++i;
+    };
+    auto readNumber = [&](size_t& i) -> double {
+      skipWs(clipJson, i);
+      size_t start = i;
+      while (i < clipJson.size() &&
+             (clipJson[i] == '-' || clipJson[i] == '+' || clipJson[i] == '.' ||
+              clipJson[i] == 'e' || clipJson[i] == 'E' ||
+              (clipJson[i] >= '0' && clipJson[i] <= '9'))) {
+        ++i;
+      }
+      if (start == i) return 0;
+      try {
+        return std::stod(clipJson.substr(start, i - start));
+      } catch (...) {
+        return 0;
+      }
+    };
+    auto readVec3 = [&](size_t& i, double v[3]) {
+      skipWs(clipJson, i);
+      if (i >= clipJson.size() || clipJson[i] != '[') return;
+      ++i;
+      for (int k = 0; k < 3; ++k) {
+        v[k] = readNumber(i);
+        skipWs(clipJson, i);
+        if (i < clipJson.size() && clipJson[i] == ',') ++i;
+      }
+      skipWs(clipJson, i);
+      if (i < clipJson.size() && clipJson[i] == ']') ++i;
+    };
+    size_t i = 0;
+    skipWs(clipJson, i);
+    if (i < clipJson.size() && clipJson[i] == '[') {
+      ++i;
+      while (i < clipJson.size()) {
+        skipWs(clipJson, i);
+        if (i < clipJson.size() && clipJson[i] == ']') break;
+        if (i >= clipJson.size() || clipJson[i] != '{') break;
+        ++i;
+        vnd::ClipPlane cp{};
+        while (i < clipJson.size() && clipJson[i] != '}') {
+          skipWs(clipJson, i);
+          if (i >= clipJson.size() || clipJson[i] != '"') break;
+          ++i;
+          size_t keyStart = i;
+          while (i < clipJson.size() && clipJson[i] != '"') ++i;
+          std::string key = clipJson.substr(keyStart, i - keyStart);
+          if (i < clipJson.size()) ++i;
+          skipWs(clipJson, i);
+          if (i < clipJson.size() && clipJson[i] == ':') ++i;
+          if (key == "pointMm") {
+            readVec3(i, cp.pointMm);
+          } else if (key == "normalMm") {
+            readVec3(i, cp.normalMm);
+          } else {
+            // Skip unknown value (number, array, or object).
+            (void)readNumber(i);
+          }
+          skipWs(clipJson, i);
+          if (i < clipJson.size() && clipJson[i] == ',') ++i;
+        }
+        if (i < clipJson.size() && clipJson[i] == '}') ++i;
+        clipPlanes.push_back(cp);
+        skipWs(clipJson, i);
+        if (i < clipJson.size() && clipJson[i] == ',') ++i;
+      }
+    }
+  }
+
   vnd::MprSliceInfo info;
   try {
     info = vnd::extractVolumeRender(static_cast<long long>(jHandle), spec,
-                                     jSlabThicknessMm, jStepMm, tf, outPath);
+                                     jSlabThicknessMm, jStepMm, tf,
+                                     clipPlanes, outPath);
   } catch (const std::exception& e) {
     throwJavaRuntime(env, e.what());
     return nullptr;

@@ -211,6 +211,12 @@ function App() {
   const [vrSlabMm, setVrSlabMm] = useState<number>(16);
   const [vrSlice, setVrSlice] = useState<MprSliceInfo | null>(null);
   const [vrErr, setVrErr] = useState<string | null>(null);
+  // Phase 6.3 — axis-aligned Z clip plane. When `vrClipEnabled` is true
+  // we pass a single plane at z = vrClipZMm with normal +Z, which
+  // discards every sample below z = clipZ. Slider range matches the
+  // synthetic 16-voxel cube (0–15 mm).
+  const [vrClipEnabled, setVrClipEnabled] = useState<boolean>(false);
+  const [vrClipZMm, setVrClipZMm] = useState<number>(8);
 
   useEffect(() => {
     try {
@@ -515,7 +521,15 @@ function App() {
   useEffect(() => {
     if (!volume || !oblique.spec) return;
     try {
-      const out = `/tmp/vnd-vr-${volume.handle}-${vrPreset}-${vrSlabMm}-${oblique.rotX.toFixed(3)}-${oblique.rotY.toFixed(3)}-${oblique.rotZ.toFixed(3)}.bin`;
+      const clipPlanes = vrClipEnabled
+        ? [
+            {
+              pointMm: [0, 0, vrClipZMm] as [number, number, number],
+              normalMm: [0, 0, 1] as [number, number, number],
+            },
+          ]
+        : undefined;
+      const out = `/tmp/vnd-vr-${volume.handle}-${vrPreset}-${vrSlabMm}-${vrClipEnabled ? `c${vrClipZMm}` : 'noclip'}-${oblique.rotX.toFixed(3)}-${oblique.rotY.toFixed(3)}-${oblique.rotZ.toFixed(3)}.bin`;
       setVrSlice(
         extractVolumeRender(
           volume.handle,
@@ -523,6 +537,7 @@ function App() {
           {
             slabThicknessMm: vrSlabMm,
             transferFunction: TF_PRESETS[vrPreset],
+            clipPlanes,
           },
           out
         )
@@ -539,6 +554,8 @@ function App() {
     oblique.rotZ,
     vrPreset,
     vrSlabMm,
+    vrClipEnabled,
+    vrClipZMm,
   ]);
 
   const overallPass =
@@ -1253,6 +1270,33 @@ function App() {
             <Text
               style={styles.sliderButton}
               onPress={() => setVrSlabMm(vrSlabMm + 4)}
+            >
+              +
+            </Text>
+          </View>
+          <Text style={styles.label}>
+            Z clip plane (Phase 6.3) · keep samples z ≥ clipZ
+          </Text>
+          <View style={styles.sliderRow}>
+            <Text
+              style={[
+                styles.toolButton,
+                vrClipEnabled && styles.toolButtonActive,
+              ]}
+              onPress={() => setVrClipEnabled(!vrClipEnabled)}
+            >
+              {vrClipEnabled ? 'CLIP ON' : 'CLIP OFF'}
+            </Text>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => setVrClipZMm(Math.max(0, vrClipZMm - 1))}
+            >
+              −
+            </Text>
+            <Text style={styles.sliderValue}>z ≥ {vrClipZMm} mm</Text>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => setVrClipZMm(Math.min(15, vrClipZMm + 1))}
             >
               +
             </Text>

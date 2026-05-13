@@ -89,10 +89,14 @@ jest.mock('../../NativeVibeNativeDicom', () => ({
       slabThicknessMm: number,
       stepMm: number,
       tfJson: string,
+      clipPlanesJson: string,
       outPath: string
     ) => {
       const spec = JSON.parse(specJson);
       const tf = JSON.parse(tfJson) as Array<unknown>;
+      const clips = clipPlanesJson
+        ? (JSON.parse(clipPlanesJson) as Array<unknown>)
+        : [];
       return {
         filePath: outPath,
         byteLength: spec.rows * spec.columns * 4,
@@ -106,6 +110,8 @@ jest.mock('../../NativeVibeNativeDicom', () => ({
         _slabThicknessMm: slabThicknessMm,
         _stepMm: stepMm,
         _tfPointsLen: tf.length,
+        _clipPlanesLen: clips.length,
+        _clipPlanesJson: clipPlanesJson,
       };
     },
     writeSyntheticVolumeSeries: (
@@ -272,6 +278,48 @@ describe('Phase 5.1 — volume / MPR bridge', () => {
     expect((out as unknown as { _tfPointsLen: number })._tfPointsLen).toBe(
       TF_PRESETS['gray-8bit'].points.length
     );
+  });
+
+  it('extractVolumeRender forwards Phase 6.3 clip planes when present', () => {
+    const spec = {
+      centerMm: [0, 0, 0] as [number, number, number],
+      uMm: [1, 0, 0] as [number, number, number],
+      vMm: [0, 1, 0] as [number, number, number],
+      columns: 16,
+      rows: 16,
+      pixelSpacingMm: 1,
+    };
+    // No clip planes → bridge gets empty string, mock reports 0.
+    const noClip = extractVolumeRender(
+      42,
+      spec,
+      { slabThicknessMm: 10, transferFunction: TF_PRESETS['gray-8bit'] },
+      '/tmp/vr-no-clip.bin'
+    );
+    expect(
+      (noClip as unknown as { _clipPlanesLen: number })._clipPlanesLen
+    ).toBe(0);
+    expect(
+      (noClip as unknown as { _clipPlanesJson: string })._clipPlanesJson
+    ).toBe('');
+
+    // Two clip planes → JSON-serialised and parsed mock-side.
+    const withClips = extractVolumeRender(
+      42,
+      spec,
+      {
+        slabThicknessMm: 10,
+        transferFunction: TF_PRESETS['gray-8bit'],
+        clipPlanes: [
+          { pointMm: [0, 0, 0], normalMm: [1, 0, 0] },
+          { pointMm: [4, 0, 0], normalMm: [-1, 0, 0] },
+        ],
+      },
+      '/tmp/vr-clipped.bin'
+    );
+    expect(
+      (withClips as unknown as { _clipPlanesLen: number })._clipPlanesLen
+    ).toBe(2);
   });
 
   it('releaseVolume is a no-op (no exception on unknown handle)', () => {

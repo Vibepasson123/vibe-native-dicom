@@ -137,6 +137,7 @@ import Foundation
     slabThicknessMm: NSNumber,
     stepMm: NSNumber,
     tfJson: NSString,
+    clipPlanesJson: NSString,
     outPath: NSString
   ) throws -> NSDictionary {
     let dict = try GdcmBridge.extractVolumeRender(
@@ -145,6 +146,7 @@ import Foundation
       slabThicknessMm: slabThicknessMm.doubleValue,
       stepMm: stepMm.doubleValue,
       tfJson: tfJson as String,
+      clipPlanesJson: clipPlanesJson as String,
       toPath: outPath as String
     )
     return dict as NSDictionary

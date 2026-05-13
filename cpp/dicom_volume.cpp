@@ -941,6 +941,7 @@ TfRgba evalTransferFunction(
 MprSliceInfo extractVolumeRender(
     long long handle, const ObliqueSpec& spec, double slabThicknessMm,
     double stepMm, const std::vector<TransferFunctionPoint>& tfPoints,
+    const std::vector<ClipPlane>& clipPlanes,
     const std::string& outPath) {
   std::lock_guard<std::mutex> lock(registryMutex());
   auto it = registry().find(handle);
@@ -1028,6 +1029,21 @@ MprSliceInfo extractVolumeRender(
         const double wx = basePx + t * nx;
         const double wy = basePy + t * ny;
         const double wz = basePz + t * nz;
+        // Phase 6.3: clip-plane gate. Skip this sample if it falls on
+        // the negative side of any plane (intersection / AND semantics).
+        bool clipped = false;
+        for (const ClipPlane& cp : clipPlanes) {
+          const double dx = wx - cp.pointMm[0];
+          const double dy = wy - cp.pointMm[1];
+          const double dz = wz - cp.pointMm[2];
+          if (dx * cp.normalMm[0] + dy * cp.normalMm[1] +
+                  dz * cp.normalMm[2] <
+              0.0) {
+            clipped = true;
+            break;
+          }
+        }
+        if (clipped) continue;
         const double sample = trilinearSample(v, wx / sx, wy / sy, wz / sz);
         TfRgba c = evalTransferFunction(tfPoints, sample);
         // Step-corrected alpha.

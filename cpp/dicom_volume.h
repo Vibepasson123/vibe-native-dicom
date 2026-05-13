@@ -215,16 +215,35 @@ struct TransferFunctionPoint {
   double opacity;
 };
 
+// Phase 6.3 — clip plane. A clip plane is a half-space: samples on
+// the *negative* side of the plane (i.e. (p - pointMm) · normalMm < 0)
+// are discarded by the ray loop. Multiple planes intersect (AND) —
+// pass several to carve a convex region out of the volume.
+//
+// `normalMm` does not have to be unit length, but it must be non-zero;
+// callers typically pass the plane unit normal. `pointMm` is any point
+// on the plane in volume mm-coords.
+struct ClipPlane {
+  double pointMm[3];
+  double normalMm[3];
+};
+
 // extractVolumeRender uses the same plane spec as MIP. The slab is
 // the integration depth for the ray-cast; thicker slab = more samples
 // per ray = more visible internal structure. tfPoints must be sorted
 // by `value` and contain at least 2 entries.
+//
+// Phase 6.3: `clipPlanes` may be empty. When non-empty, each ray sample
+// must lie on the positive side of EVERY plane to contribute — samples
+// that fail the test are simply skipped (the ray continues, accA stays
+// where it was). This composes cleanly with early termination.
 //
 // Output: RGBA8 (samplesPerPixel=4) at outPath. The viewer branches
 // on samplesPerPixel to render colour without window/level.
 MprSliceInfo extractVolumeRender(
     long long handle, const ObliqueSpec& spec, double slabThicknessMm,
     double stepMm, const std::vector<TransferFunctionPoint>& tfPoints,
+    const std::vector<ClipPlane>& clipPlanes,
     const std::string& outPath);
 
 }  // namespace vnd

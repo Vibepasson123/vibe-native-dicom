@@ -147,12 +147,18 @@ export interface Spec extends TurboModule {
   // objects (sorted by `value`). Output is RGBA8 — caller must check
   // MprSliceInfo.samplesPerPixel === 4 and route to the colour viewer
   // path.
+  //
+  // Phase 6.3 — clipPlanesJson is a JSON-encoded array of clip-plane
+  // objects: [{"pointMm":[x,y,z],"normalMm":[x,y,z]}, ...]. Pass an
+  // empty string for "no clipping". Samples are kept only when on the
+  // positive side of every plane (intersection / AND).
   extractVolumeRender(
     handle: number,
     specJson: string,
     slabThicknessMm: number,
     stepMm: number,
     tfJson: string,
+    clipPlanesJson: string,
     outPath: string
   ): Object;
 }

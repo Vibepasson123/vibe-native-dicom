@@ -110,11 +110,17 @@ NS_ASSUME_NONNULL_BEGIN
 // Phase 6.2 — full volume rendering with transfer function. tfJson is
 // a JSON-encoded array of TransferFunctionPoint objects (sorted by
 // `value`). Output is RGBA8.
+//
+// Phase 6.3 — clipPlanesJson is a JSON-encoded array of clip-plane
+// objects: [{"pointMm":[x,y,z],"normalMm":[x,y,z]}, ...]. Pass nil or
+// an empty string for no clipping. A sample is kept only if it is on
+// the positive side of EVERY plane (intersection / AND).
 + (nullable NSDictionary *)extractVolumeRenderFromHandle:(double)handle
                                                   specJson:(NSString *)specJson
                                            slabThicknessMm:(double)slabThicknessMm
                                                     stepMm:(double)stepMm
                                                     tfJson:(NSString *)tfJson
+                                            clipPlanesJson:(nullable NSString *)clipPlanesJson
                                                     toPath:(NSString *)outPath
                                                      error:(NSError **)error;
 

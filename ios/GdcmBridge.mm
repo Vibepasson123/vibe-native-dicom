@@ -296,6 +296,7 @@ static NSDictionary *datasetToDictionary(const vnd::DicomDataset &ds) {
                                            slabThicknessMm:(double)slabThicknessMm
                                                     stepMm:(double)stepMm
                                                     tfJson:(NSString *)tfJson
+                                            clipPlanesJson:(nullable NSString *)clipPlanesJson
                                                     toPath:(NSString *)outPath
                                                      error:(NSError **)error {
   NSData *specData = [specJson dataUsingEncoding:NSUTF8StringEncoding];
@@ -353,10 +354,38 @@ static NSDictionary *datasetToDictionary(const vnd::DicomDataset &ds) {
     tf.push_back(pt);
   }
 
+  // Phase 6.3: parse clip planes. nil / empty / malformed → no planes.
+  std::vector<vnd::ClipPlane> clipPlanes;
+  if (clipPlanesJson != nil && clipPlanesJson.length > 0) {
+    NSData *clipData = [clipPlanesJson dataUsingEncoding:NSUTF8StringEncoding];
+    NSError *clipErr = nil;
+    id parsedClip = [NSJSONSerialization JSONObjectWithData:clipData
+                                                    options:0
+                                                      error:&clipErr];
+    if (!clipErr && [parsedClip isKindOfClass:[NSArray class]]) {
+      for (id entry in (NSArray *)parsedClip) {
+        if (![entry isKindOfClass:[NSDictionary class]]) continue;
+        NSDictionary *p = (NSDictionary *)entry;
+        NSArray *pt = p[@"pointMm"];
+        NSArray *nrm = p[@"normalMm"];
+        if (![pt isKindOfClass:[NSArray class]] || pt.count < 3) continue;
+        if (![nrm isKindOfClass:[NSArray class]] || nrm.count < 3) continue;
+        vnd::ClipPlane cp{};
+        cp.pointMm[0] = [pt[0] doubleValue];
+        cp.pointMm[1] = [pt[1] doubleValue];
+        cp.pointMm[2] = [pt[2] doubleValue];
+        cp.normalMm[0] = [nrm[0] doubleValue];
+        cp.normalMm[1] = [nrm[1] doubleValue];
+        cp.normalMm[2] = [nrm[2] doubleValue];
+        clipPlanes.push_back(cp);
+      }
+    }
+  }
+
   vnd::MprSliceInfo info;
   try {
     info = vnd::extractVolumeRender(static_cast<long long>(handle), spec,
-                                     slabThicknessMm, stepMm, tf,
+                                     slabThicknessMm, stepMm, tf, clipPlanes,
                                      std::string([outPath UTF8String]));
   } catch (const std::exception &e) {
     if (error) *error = makeError(e.what());
