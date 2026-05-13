@@ -136,6 +136,7 @@
                    stepMm:(double)stepMm
                    tfJson:(NSString *)tfJson
            clipPlanesJson:(NSString *)clipPlanesJson
+             lightingJson:(NSString *)lightingJson
                   outPath:(NSString *)outPath {
   NSError *error = nil;
   NSDictionary *result = [VibeNativeDicomImpl
@@ -145,6 +146,7 @@
                    stepMm:@(stepMm)
                    tfJson:tfJson
            clipPlanesJson:clipPlanesJson
+             lightingJson:lightingJson
                   outPath:outPath
                     error:&error];
   if (result == nil) {

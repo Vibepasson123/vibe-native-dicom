@@ -134,6 +134,7 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
     stepMm: Double,
     tfJson: String,
     clipPlanesJson: String,
+    lightingJson: String,
     outPath: String
   ): WritableMap {
     @Suppress("UNCHECKED_CAST")
@@ -145,6 +146,7 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
         stepMm,
         tfJson,
         clipPlanesJson,
+        lightingJson,
         outPath
       ) as java.util.HashMap<String, Any?>
     return Arguments.makeNativeMap(raw)
@@ -244,6 +246,7 @@ class VibeNativeDicomModule(reactContext: ReactApplicationContext) :
     stepMm: Double,
     tfJson: String,
     clipPlanesJson: String,
+    lightingJson: String,
     outPath: String
   ): Any
   private external fun nativeWriteSyntheticVolumeSeries(

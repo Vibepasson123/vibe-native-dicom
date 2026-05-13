@@ -138,6 +138,7 @@ import Foundation
     stepMm: NSNumber,
     tfJson: NSString,
     clipPlanesJson: NSString,
+    lightingJson: NSString,
     outPath: NSString
   ) throws -> NSDictionary {
     let dict = try GdcmBridge.extractVolumeRender(
@@ -147,6 +148,7 @@ import Foundation
       stepMm: stepMm.doubleValue,
       tfJson: tfJson as String,
       clipPlanesJson: clipPlanesJson as String,
+      lightingJson: lightingJson as String,
       toPath: outPath as String
     )
     return dict as NSDictionary

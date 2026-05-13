@@ -90,6 +90,7 @@ jest.mock('../../NativeVibeNativeDicom', () => ({
       stepMm: number,
       tfJson: string,
       clipPlanesJson: string,
+      lightingJson: string,
       outPath: string
     ) => {
       const spec = JSON.parse(specJson);
@@ -97,6 +98,7 @@ jest.mock('../../NativeVibeNativeDicom', () => ({
       const clips = clipPlanesJson
         ? (JSON.parse(clipPlanesJson) as Array<unknown>)
         : [];
+      const lighting = lightingJson ? JSON.parse(lightingJson) : null;
       return {
         filePath: outPath,
         byteLength: spec.rows * spec.columns * 4,
@@ -112,6 +114,8 @@ jest.mock('../../NativeVibeNativeDicom', () => ({
         _tfPointsLen: tf.length,
         _clipPlanesLen: clips.length,
         _clipPlanesJson: clipPlanesJson,
+        _lightingEnabled: lighting?.enabled ?? false,
+        _lightingJson: lightingJson,
       };
     },
     writeSyntheticVolumeSeries: (
@@ -320,6 +324,77 @@ describe('Phase 5.1 — volume / MPR bridge', () => {
     expect(
       (withClips as unknown as { _clipPlanesLen: number })._clipPlanesLen
     ).toBe(2);
+  });
+
+  it('extractVolumeRender forwards Phase 6.4 lighting only when enabled', () => {
+    const spec = {
+      centerMm: [0, 0, 0] as [number, number, number],
+      uMm: [1, 0, 0] as [number, number, number],
+      vMm: [0, 1, 0] as [number, number, number],
+      columns: 16,
+      rows: 16,
+      pixelSpacingMm: 1,
+    };
+    // No lighting → empty bridge string, mock reports disabled.
+    const unlit = extractVolumeRender(
+      42,
+      spec,
+      { slabThicknessMm: 10, transferFunction: TF_PRESETS['gray-8bit'] },
+      '/tmp/vr-unlit.bin'
+    );
+    expect(
+      (unlit as unknown as { _lightingEnabled: boolean })._lightingEnabled
+    ).toBe(false);
+    expect((unlit as unknown as { _lightingJson: string })._lightingJson).toBe(
+      ''
+    );
+
+    // enabled=false → still no bridge payload.
+    const explicitlyDisabled = extractVolumeRender(
+      42,
+      spec,
+      {
+        slabThicknessMm: 10,
+        transferFunction: TF_PRESETS['gray-8bit'],
+        lighting: {
+          enabled: false,
+          ambient: 0.2,
+          diffuse: 0.7,
+          specular: 0.3,
+          shininess: 32,
+          gradientThreshold: 4,
+          lightDirMm: [1, 1, 1],
+        },
+      },
+      '/tmp/vr-disabled.bin'
+    );
+    expect(
+      (explicitlyDisabled as unknown as { _lightingEnabled: boolean })
+        ._lightingEnabled
+    ).toBe(false);
+
+    // enabled=true → JSON-serialised and parsed mock-side.
+    const lit = extractVolumeRender(
+      42,
+      spec,
+      {
+        slabThicknessMm: 10,
+        transferFunction: TF_PRESETS['gray-8bit'],
+        lighting: {
+          enabled: true,
+          ambient: 0.2,
+          diffuse: 0.7,
+          specular: 0.3,
+          shininess: 32,
+          gradientThreshold: 4,
+          lightDirMm: [1, 1, 1],
+        },
+      },
+      '/tmp/vr-lit.bin'
+    );
+    expect(
+      (lit as unknown as { _lightingEnabled: boolean })._lightingEnabled
+    ).toBe(true);
   });
 
   it('releaseVolume is a no-op (no exception on unknown handle)', () => {

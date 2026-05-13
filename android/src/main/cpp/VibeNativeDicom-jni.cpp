@@ -674,7 +674,7 @@ extern "C" JNIEXPORT jobject JNICALL
 Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeExtractVolumeRender(
     JNIEnv* env, jobject /* this */, jdouble jHandle, jstring jSpecJson,
     jdouble jSlabThicknessMm, jdouble jStepMm, jstring jTfJson,
-    jstring jClipPlanesJson, jstring jOutPath) {
+    jstring jClipPlanesJson, jstring jLightingJson, jstring jOutPath) {
   if (jSpecJson == nullptr || jTfJson == nullptr || jOutPath == nullptr) {
     throwJavaRuntime(env, "extractVolumeRender: null arg");
     return nullptr;
@@ -682,27 +682,34 @@ Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeExtractVolumeRende
   const char* cSpec = env->GetStringUTFChars(jSpecJson, nullptr);
   const char* cTf = env->GetStringUTFChars(jTfJson, nullptr);
   const char* cOut = env->GetStringUTFChars(jOutPath, nullptr);
-  // clipPlanesJson is allowed to be null (= no planes).
+  // clipPlanesJson + lightingJson are allowed to be null (= disabled).
   const char* cClip =
       (jClipPlanesJson != nullptr)
           ? env->GetStringUTFChars(jClipPlanesJson, nullptr)
+          : nullptr;
+  const char* cLight =
+      (jLightingJson != nullptr)
+          ? env->GetStringUTFChars(jLightingJson, nullptr)
           : nullptr;
   if (cSpec == nullptr || cTf == nullptr || cOut == nullptr) {
     if (cSpec) env->ReleaseStringUTFChars(jSpecJson, cSpec);
     if (cTf) env->ReleaseStringUTFChars(jTfJson, cTf);
     if (cOut) env->ReleaseStringUTFChars(jOutPath, cOut);
     if (cClip) env->ReleaseStringUTFChars(jClipPlanesJson, cClip);
+    if (cLight) env->ReleaseStringUTFChars(jLightingJson, cLight);
     throwJavaRuntime(env, "extractVolumeRender: bad string encoding");
     return nullptr;
   }
   std::string specJson(cSpec);
   std::string tfJson(cTf);
   std::string clipJson(cClip ? cClip : "");
+  std::string lightJson(cLight ? cLight : "");
   std::string outPath(cOut);
   env->ReleaseStringUTFChars(jSpecJson, cSpec);
   env->ReleaseStringUTFChars(jTfJson, cTf);
   env->ReleaseStringUTFChars(jOutPath, cOut);
   if (cClip) env->ReleaseStringUTFChars(jClipPlanesJson, cClip);
+  if (cLight) env->ReleaseStringUTFChars(jLightingJson, cLight);
 
   vnd::ObliqueSpec spec;
   if (!parseObliqueSpec(specJson, spec)) {
@@ -853,11 +860,95 @@ Java_com_viveksah_vibenativedicom_VibeNativeDicomModule_nativeExtractVolumeRende
     }
   }
 
+  // Phase 6.4: parse lighting options. Empty → disabled (legacy
+  // 6.3 behaviour). Shape:
+  //   {"enabled":true,"ambient":0.2,"diffuse":0.7,"specular":0.3,
+  //    "shininess":32,"gradientThreshold":4,"lightDirMm":[x,y,z]}
+  vnd::LightingOptions lighting{};
+  lighting.enabled = false;
+  if (!lightJson.empty()) {
+    auto skipWs = [](const std::string& s, size_t& i) {
+      while (i < s.size() && (s[i] == ' ' || s[i] == '\t' ||
+                                s[i] == '\n' || s[i] == '\r' || s[i] == '\f'))
+        ++i;
+    };
+    auto readNumber = [&](size_t& i) -> double {
+      skipWs(lightJson, i);
+      size_t start = i;
+      while (i < lightJson.size() &&
+             (lightJson[i] == '-' || lightJson[i] == '+' ||
+              lightJson[i] == '.' || lightJson[i] == 'e' ||
+              lightJson[i] == 'E' ||
+              (lightJson[i] >= '0' && lightJson[i] <= '9'))) {
+        ++i;
+      }
+      if (start == i) return 0;
+      try {
+        return std::stod(lightJson.substr(start, i - start));
+      } catch (...) {
+        return 0;
+      }
+    };
+    auto readBool = [&](size_t& i) -> bool {
+      skipWs(lightJson, i);
+      if (i + 4 <= lightJson.size() &&
+          lightJson.compare(i, 4, "true") == 0) {
+        i += 4;
+        return true;
+      }
+      if (i + 5 <= lightJson.size() &&
+          lightJson.compare(i, 5, "false") == 0) {
+        i += 5;
+        return false;
+      }
+      return false;
+    };
+    auto readVec3 = [&](size_t& i, double v[3]) {
+      skipWs(lightJson, i);
+      if (i >= lightJson.size() || lightJson[i] != '[') return;
+      ++i;
+      for (int k = 0; k < 3; ++k) {
+        v[k] = readNumber(i);
+        skipWs(lightJson, i);
+        if (i < lightJson.size() && lightJson[i] == ',') ++i;
+      }
+      skipWs(lightJson, i);
+      if (i < lightJson.size() && lightJson[i] == ']') ++i;
+    };
+    size_t i = 0;
+    skipWs(lightJson, i);
+    if (i < lightJson.size() && lightJson[i] == '{') {
+      ++i;
+      while (i < lightJson.size() && lightJson[i] != '}') {
+        skipWs(lightJson, i);
+        if (i >= lightJson.size() || lightJson[i] != '"') break;
+        ++i;
+        size_t keyStart = i;
+        while (i < lightJson.size() && lightJson[i] != '"') ++i;
+        std::string key = lightJson.substr(keyStart, i - keyStart);
+        if (i < lightJson.size()) ++i;
+        skipWs(lightJson, i);
+        if (i < lightJson.size() && lightJson[i] == ':') ++i;
+        if (key == "enabled") lighting.enabled = readBool(i);
+        else if (key == "ambient") lighting.ambient = readNumber(i);
+        else if (key == "diffuse") lighting.diffuse = readNumber(i);
+        else if (key == "specular") lighting.specular = readNumber(i);
+        else if (key == "shininess") lighting.shininess = readNumber(i);
+        else if (key == "gradientThreshold")
+          lighting.gradientThreshold = readNumber(i);
+        else if (key == "lightDirMm") readVec3(i, lighting.lightDirMm);
+        else (void)readNumber(i);
+        skipWs(lightJson, i);
+        if (i < lightJson.size() && lightJson[i] == ',') ++i;
+      }
+    }
+  }
+
   vnd::MprSliceInfo info;
   try {
     info = vnd::extractVolumeRender(static_cast<long long>(jHandle), spec,
                                      jSlabThicknessMm, jStepMm, tf,
-                                     clipPlanes, outPath);
+                                     clipPlanes, lighting, outPath);
   } catch (const std::exception& e) {
     throwJavaRuntime(env, e.what());
     return nullptr;

@@ -1,6 +1,7 @@
 export type {
   BuildVolumeOptions,
   ClipPlane,
+  LightingOptions,
   MprPlane,
   MprSliceInfo,
   ObliqueSpec,

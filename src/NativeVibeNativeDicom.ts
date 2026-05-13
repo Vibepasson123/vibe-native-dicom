@@ -152,6 +152,11 @@ export interface Spec extends TurboModule {
   // objects: [{"pointMm":[x,y,z],"normalMm":[x,y,z]}, ...]. Pass an
   // empty string for "no clipping". Samples are kept only when on the
   // positive side of every plane (intersection / AND).
+  //
+  // Phase 6.4 — lightingJson is a JSON-encoded LightingOptions object:
+  //   {"enabled":true,"ambient":0.2,"diffuse":0.7,"specular":0.3,
+  //    "shininess":32,"gradientThreshold":4,"lightDirMm":[x,y,z]}
+  // Pass empty string to disable Phong shading (Phase 6.3 behaviour).
   extractVolumeRender(
     handle: number,
     specJson: string,
@@ -159,6 +164,7 @@ export interface Spec extends TurboModule {
     stepMm: number,
     tfJson: string,
     clipPlanesJson: string,
+    lightingJson: string,
     outPath: string
   ): Object;
 }

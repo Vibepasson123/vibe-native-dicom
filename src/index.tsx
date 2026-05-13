@@ -73,6 +73,7 @@ export {
   type TfPresetName,
   type BuildVolumeOptions,
   type ClipPlane,
+  type LightingOptions,
   type SyntheticVolumeSeriesOptions,
   type MprPlane,
   type MprSliceInfo,

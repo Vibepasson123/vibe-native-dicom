@@ -91,6 +91,11 @@ export function extractVolumeRender(
     opts.clipPlanes && opts.clipPlanes.length > 0
       ? JSON.stringify(opts.clipPlanes)
       : '';
+  // Phase 6.4: serialise lighting only when explicitly enabled.
+  // `enabled=false` and `undefined` both produce the empty bridge
+  // string → the native side skips the Phong path entirely.
+  const lightJson =
+    opts.lighting && opts.lighting.enabled ? JSON.stringify(opts.lighting) : '';
   return VibeNativeDicom.extractVolumeRender(
     handle,
     JSON.stringify(spec),
@@ -98,6 +103,7 @@ export function extractVolumeRender(
     opts.stepMm ?? 0,
     JSON.stringify(opts.transferFunction.points),
     clipJson,
+    lightJson,
     outPath
   ) as MprSliceInfo;
 }

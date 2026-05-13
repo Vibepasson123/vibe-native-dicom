@@ -297,6 +297,7 @@ static NSDictionary *datasetToDictionary(const vnd::DicomDataset &ds) {
                                                     stepMm:(double)stepMm
                                                     tfJson:(NSString *)tfJson
                                             clipPlanesJson:(nullable NSString *)clipPlanesJson
+                                              lightingJson:(nullable NSString *)lightingJson
                                                     toPath:(NSString *)outPath
                                                      error:(NSError **)error {
   NSData *specData = [specJson dataUsingEncoding:NSUTF8StringEncoding];
@@ -382,10 +383,39 @@ static NSDictionary *datasetToDictionary(const vnd::DicomDataset &ds) {
     }
   }
 
+  // Phase 6.4: parse lighting options. nil / empty → disabled.
+  vnd::LightingOptions lighting{};
+  lighting.enabled = false;
+  if (lightingJson != nil && lightingJson.length > 0) {
+    NSData *lightData =
+        [lightingJson dataUsingEncoding:NSUTF8StringEncoding];
+    NSError *lightErr = nil;
+    id parsedLight = [NSJSONSerialization JSONObjectWithData:lightData
+                                                     options:0
+                                                       error:&lightErr];
+    if (!lightErr && [parsedLight isKindOfClass:[NSDictionary class]]) {
+      NSDictionary *p = (NSDictionary *)parsedLight;
+      lighting.enabled = [p[@"enabled"] boolValue];
+      lighting.ambient = [p[@"ambient"] doubleValue];
+      lighting.diffuse = [p[@"diffuse"] doubleValue];
+      lighting.specular = [p[@"specular"] doubleValue];
+      lighting.shininess = [p[@"shininess"] doubleValue];
+      lighting.gradientThreshold =
+          [p[@"gradientThreshold"] doubleValue];
+      NSArray *dir = p[@"lightDirMm"];
+      if ([dir isKindOfClass:[NSArray class]] && dir.count >= 3) {
+        lighting.lightDirMm[0] = [dir[0] doubleValue];
+        lighting.lightDirMm[1] = [dir[1] doubleValue];
+        lighting.lightDirMm[2] = [dir[2] doubleValue];
+      }
+    }
+  }
+
   vnd::MprSliceInfo info;
   try {
     info = vnd::extractVolumeRender(static_cast<long long>(handle), spec,
                                      slabThicknessMm, stepMm, tf, clipPlanes,
+                                     lighting,
                                      std::string([outPath UTF8String]));
   } catch (const std::exception &e) {
     if (error) *error = makeError(e.what());

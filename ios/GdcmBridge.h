@@ -115,12 +115,18 @@ NS_ASSUME_NONNULL_BEGIN
 // objects: [{"pointMm":[x,y,z],"normalMm":[x,y,z]}, ...]. Pass nil or
 // an empty string for no clipping. A sample is kept only if it is on
 // the positive side of EVERY plane (intersection / AND).
+//
+// Phase 6.4 — lightingJson is a JSON-encoded LightingOptions object:
+//   {"enabled":true,"ambient":0.2,"diffuse":0.7,"specular":0.3,
+//    "shininess":32,"gradientThreshold":4,"lightDirMm":[x,y,z]}
+// Pass nil / empty string for "no shading" (Phase 6.3 behaviour).
 + (nullable NSDictionary *)extractVolumeRenderFromHandle:(double)handle
                                                   specJson:(NSString *)specJson
                                            slabThicknessMm:(double)slabThicknessMm
                                                     stepMm:(double)stepMm
                                                     tfJson:(NSString *)tfJson
                                             clipPlanesJson:(nullable NSString *)clipPlanesJson
+                                              lightingJson:(nullable NSString *)lightingJson
                                                     toPath:(NSString *)outPath
                                                      error:(NSError **)error;
 

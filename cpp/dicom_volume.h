@@ -228,6 +228,29 @@ struct ClipPlane {
   double normalMm[3];
 };
 
+// Phase 6.4 — local Phong shading. When `enabled` is true, each ray
+// sample's TF colour is shaded against the local intensity gradient.
+// The gradient is computed via 6-point central differences using
+// trilinear samples one voxel away on each axis; flipped + normalized
+// it becomes a surface normal. Samples whose gradient magnitude falls
+// below `gradientThreshold` skip shading and keep their unlit TF
+// colour — flat interior regions stay TF-pure, only "edges" pick up
+// highlights. lightDirMm is the (world-space) direction *from* the
+// surface *toward* the light; it does not need to be normalized.
+//
+// Defaults (Ka, Kd, Ks, shininess) match a generic "soft tissue"
+// lighting model — tweakable per-call. View direction is taken as
+// the plane normal (toward the camera).
+struct LightingOptions {
+  bool enabled;
+  double ambient;            // Ka in [0, 1]
+  double diffuse;            // Kd in [0, 1]
+  double specular;           // Ks in [0, 1]
+  double shininess;          // Phong exponent, typically 8..128
+  double gradientThreshold;  // skip shading below this gradient mag
+  double lightDirMm[3];      // pointing FROM surface TOWARD light
+};
+
 // extractVolumeRender uses the same plane spec as MIP. The slab is
 // the integration depth for the ray-cast; thicker slab = more samples
 // per ray = more visible internal structure. tfPoints must be sorted
@@ -238,12 +261,19 @@ struct ClipPlane {
 // that fail the test are simply skipped (the ray continues, accA stays
 // where it was). This composes cleanly with early termination.
 //
+// Phase 6.4: `lighting.enabled=false` reproduces Phase 6.3 behaviour
+// exactly (no gradient evaluations, no Phong term). Enabling it adds
+// 6 trilinear samples per shaded ray sample — expect ~7× CPU cost in
+// the inner loop, mitigated by the gradient threshold gating which
+// returns flat regions to the unshaded fast path.
+//
 // Output: RGBA8 (samplesPerPixel=4) at outPath. The viewer branches
 // on samplesPerPixel to render colour without window/level.
 MprSliceInfo extractVolumeRender(
     long long handle, const ObliqueSpec& spec, double slabThicknessMm,
     double stepMm, const std::vector<TransferFunctionPoint>& tfPoints,
     const std::vector<ClipPlane>& clipPlanes,
+    const LightingOptions& lighting,
     const std::string& outPath);
 
 }  // namespace vnd

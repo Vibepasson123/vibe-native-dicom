@@ -104,12 +104,44 @@ export type ClipPlane = {
   normalMm: [number, number, number];
 };
 
+/**
+ * Phase 6.4 — Phong lighting parameters for volume rendering.
+ *
+ * `enabled=false` (or omitting LightingOptions entirely) reproduces
+ * Phase 6.3 behaviour exactly. When enabled, each shaded sample picks
+ * up an ambient term + diffuse·(L·N) + specular·(H·N)^shininess. The
+ * surface normal N is taken from the flipped local intensity gradient
+ * — samples whose gradient magnitude is below `gradientThreshold`
+ * skip shading, so flat homogeneous regions stay TF-pure.
+ *
+ * `lightDirMm` points FROM the surface TOWARD the light, in volume
+ * mm-coords; it does not need to be unit length. A common default is
+ * `[1, 1, 1]` (over-the-shoulder).
+ */
+export type LightingOptions = {
+  enabled: boolean;
+  /** Ambient coefficient Ka in [0, 1]. */
+  ambient: number;
+  /** Diffuse coefficient Kd in [0, 1]. */
+  diffuse: number;
+  /** Specular coefficient Ks in [0, 1]. */
+  specular: number;
+  /** Phong exponent, typically 8..128. Higher = tighter highlight. */
+  shininess: number;
+  /** Skip shading where gradient magnitude is below this value. */
+  gradientThreshold: number;
+  /** From surface toward light, volume mm-coords. */
+  lightDirMm: [number, number, number];
+};
+
 export type VolumeRenderOptions = {
   slabThicknessMm: number;
   stepMm?: number;
   transferFunction: TransferFunction;
   /** Phase 6.3 — optional half-space clips applied to every ray sample. */
   clipPlanes?: ClipPlane[];
+  /** Phase 6.4 — optional Phong shading. Omit / disable for raw TF. */
+  lighting?: LightingOptions;
 };
 
 export type VolumeInfo = {

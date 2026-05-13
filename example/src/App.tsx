@@ -217,6 +217,15 @@ function App() {
   // synthetic 16-voxel cube (0–15 mm).
   const [vrClipEnabled, setVrClipEnabled] = useState<boolean>(false);
   const [vrClipZMm, setVrClipZMm] = useState<number>(8);
+  // Phase 6.4 — Phong shading toggle + light "strength" preset.
+  // Each preset scales (ambient, diffuse, specular) together; the
+  // shininess + gradient threshold are tuned for the 8-bit synthetic
+  // gradient (values 0..255, so a threshold of 4 marks any non-flat
+  // patch). Light direction is "over-the-shoulder" along (1,1,1).
+  type VrLightStrength = 'soft' | 'medium' | 'hard';
+  const [vrLightEnabled, setVrLightEnabled] = useState<boolean>(false);
+  const [vrLightStrength, setVrLightStrength] =
+    useState<VrLightStrength>('medium');
 
   useEffect(() => {
     try {
@@ -529,7 +538,25 @@ function App() {
             },
           ]
         : undefined;
-      const out = `/tmp/vnd-vr-${volume.handle}-${vrPreset}-${vrSlabMm}-${vrClipEnabled ? `c${vrClipZMm}` : 'noclip'}-${oblique.rotX.toFixed(3)}-${oblique.rotY.toFixed(3)}-${oblique.rotZ.toFixed(3)}.bin`;
+      // Phase 6.4 — light strength presets. Diffuse drives most of the
+      // visible shading; specular drives the highlight tightness.
+      const strengthTuned = {
+        soft: { ambient: 0.4, diffuse: 0.5, specular: 0.1, shininess: 8 },
+        medium: { ambient: 0.2, diffuse: 0.7, specular: 0.3, shininess: 32 },
+        hard: { ambient: 0.05, diffuse: 0.85, specular: 0.55, shininess: 64 },
+      }[vrLightStrength];
+      const lighting = vrLightEnabled
+        ? {
+            enabled: true,
+            ambient: strengthTuned.ambient,
+            diffuse: strengthTuned.diffuse,
+            specular: strengthTuned.specular,
+            shininess: strengthTuned.shininess,
+            gradientThreshold: 4,
+            lightDirMm: [1, 1, 1] as [number, number, number],
+          }
+        : undefined;
+      const out = `/tmp/vnd-vr-${volume.handle}-${vrPreset}-${vrSlabMm}-${vrClipEnabled ? `c${vrClipZMm}` : 'noclip'}-${vrLightEnabled ? `l${vrLightStrength}` : 'nol'}-${oblique.rotX.toFixed(3)}-${oblique.rotY.toFixed(3)}-${oblique.rotZ.toFixed(3)}.bin`;
       setVrSlice(
         extractVolumeRender(
           volume.handle,
@@ -538,6 +565,7 @@ function App() {
             slabThicknessMm: vrSlabMm,
             transferFunction: TF_PRESETS[vrPreset],
             clipPlanes,
+            lighting,
           },
           out
         )
@@ -556,6 +584,8 @@ function App() {
     vrSlabMm,
     vrClipEnabled,
     vrClipZMm,
+    vrLightEnabled,
+    vrLightStrength,
   ]);
 
   const overallPass =
@@ -1300,6 +1330,32 @@ function App() {
             >
               +
             </Text>
+          </View>
+          <Text style={styles.label}>
+            Phong shading (Phase 6.4) · central-difference gradient
+          </Text>
+          <View style={styles.sliderRow}>
+            <Text
+              style={[
+                styles.toolButton,
+                vrLightEnabled && styles.toolButtonActive,
+              ]}
+              onPress={() => setVrLightEnabled(!vrLightEnabled)}
+            >
+              {vrLightEnabled ? 'LIGHT ON' : 'LIGHT OFF'}
+            </Text>
+            {(['soft', 'medium', 'hard'] as VrLightStrength[]).map((s) => {
+              const active = s === vrLightStrength;
+              return (
+                <Text
+                  key={s}
+                  style={[styles.toolButton, active && styles.toolButtonActive]}
+                  onPress={() => setVrLightStrength(s)}
+                >
+                  {s}
+                </Text>
+              );
+            })}
           </View>
         </View>
       )}

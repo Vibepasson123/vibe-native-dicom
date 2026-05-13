@@ -942,6 +942,7 @@ MprSliceInfo extractVolumeRender(
     long long handle, const ObliqueSpec& spec, double slabThicknessMm,
     double stepMm, const std::vector<TransferFunctionPoint>& tfPoints,
     const std::vector<ClipPlane>& clipPlanes,
+    const LightingOptions& lighting,
     const std::string& outPath) {
   std::lock_guard<std::mutex> lock(registryMutex());
   auto it = registry().find(handle);
@@ -1007,6 +1008,50 @@ MprSliceInfo extractVolumeRender(
   const double refStep = defaultStep;
   const double opacityExponent = (refStep > 0) ? (stepMm / refStep) : 1.0;
 
+  // Phase 6.4: precompute normalized light + view + halfway vectors
+  // for Phong. View direction points from the surface toward the
+  // camera; rays travel along +n (the plane normal), so the camera
+  // sits on the -n side and V = -n_hat. Light direction is whatever
+  // the caller passed, normalized; halfway = normalize(L + V). These
+  // are all constant across the image, so once is enough.
+  double Lx = 0, Ly = 0, Lz = 0, Vx = 0, Vy = 0, Vz = 0;
+  double Hx = 0, Hy = 0, Hz = 0;
+  // Gradient step in voxel-space (one voxel along each volume axis).
+  // We sample in mm-space, so the step itself is the per-axis spacing.
+  const double gradH = std::min({sx, sy, sz});
+  if (lighting.enabled) {
+    const double nlen = std::sqrt(nx * nx + ny * ny + nz * nz);
+    if (nlen > 0) {
+      Vx = -nx / nlen;
+      Vy = -ny / nlen;
+      Vz = -nz / nlen;
+    }
+    const double llen = std::sqrt(
+        lighting.lightDirMm[0] * lighting.lightDirMm[0] +
+        lighting.lightDirMm[1] * lighting.lightDirMm[1] +
+        lighting.lightDirMm[2] * lighting.lightDirMm[2]);
+    if (llen > 0) {
+      Lx = lighting.lightDirMm[0] / llen;
+      Ly = lighting.lightDirMm[1] / llen;
+      Lz = lighting.lightDirMm[2] / llen;
+    } else {
+      // Caller passed a zero light vector — fall back to view direction
+      // so we never end up with a NaN normalize down below.
+      Lx = Vx;
+      Ly = Vy;
+      Lz = Vz;
+    }
+    double hx = Lx + Vx;
+    double hy = Ly + Vy;
+    double hz = Lz + Vz;
+    const double hlen = std::sqrt(hx * hx + hy * hy + hz * hz);
+    if (hlen > 0) {
+      Hx = hx / hlen;
+      Hy = hy / hlen;
+      Hz = hz / hlen;
+    }
+  }
+
   for (int j = 0; j < spec.rows; ++j) {
     for (int i = 0; i < spec.columns; ++i) {
       const double du = (i - halfW) * spec.pixelSpacingMm;
@@ -1049,6 +1094,50 @@ MprSliceInfo extractVolumeRender(
         // Step-corrected alpha.
         if (opacityExponent != 1.0 && c.a > 0 && c.a < 1) {
           c.a = 1.0 - std::pow(1.0 - c.a, opacityExponent);
+        }
+        // Phase 6.4: Phong shading. Only worth the 6 extra trilinear
+        // taps when the sample has measurable opacity AND the local
+        // gradient is non-trivial — flat homogeneous regions skip
+        // straight to the unshaded TF colour.
+        if (lighting.enabled && c.a > 0) {
+          const double gxp = trilinearSample(
+              v, (wx + gradH) / sx, wy / sy, wz / sz);
+          const double gxm = trilinearSample(
+              v, (wx - gradH) / sx, wy / sy, wz / sz);
+          const double gyp = trilinearSample(
+              v, wx / sx, (wy + gradH) / sy, wz / sz);
+          const double gym = trilinearSample(
+              v, wx / sx, (wy - gradH) / sy, wz / sz);
+          const double gzp = trilinearSample(
+              v, wx / sx, wy / sy, (wz + gradH) / sz);
+          const double gzm = trilinearSample(
+              v, wx / sx, wy / sy, (wz - gradH) / sz);
+          // Central differences; the 1/(2h) factor cancels on normalize.
+          const double gx = gxp - gxm;
+          const double gy = gyp - gym;
+          const double gz = gzp - gzm;
+          const double gmag = std::sqrt(gx * gx + gy * gy + gz * gz);
+          if (gmag > lighting.gradientThreshold) {
+            // Surface normal points OPPOSITE the intensity gradient
+            // (intensity rises *into* the surface from background).
+            const double Nx = -gx / gmag;
+            const double Ny = -gy / gmag;
+            const double Nz = -gz / gmag;
+            double NdotL = Nx * Lx + Ny * Ly + Nz * Lz;
+            if (NdotL < 0) NdotL = 0;  // light from behind: no diffuse
+            double NdotH = Nx * Hx + Ny * Hy + Nz * Hz;
+            if (NdotH < 0) NdotH = 0;
+            const double spec =
+                lighting.specular *
+                std::pow(NdotH, std::max(1.0, lighting.shininess));
+            const double k =
+                lighting.ambient + lighting.diffuse * NdotL;
+            // Apply k to colour, add white-spec on top. Clamp to [0,1]
+            // so the alpha-blend math below stays well-behaved.
+            c.r = std::min(1.0, c.r * k + spec);
+            c.g = std::min(1.0, c.g * k + spec);
+            c.b = std::min(1.0, c.b * k + spec);
+          }
         }
         // Front-to-back blend: out += (1 - acc_a) * (a * colour).
         const double w = (1.0 - accA) * c.a;
