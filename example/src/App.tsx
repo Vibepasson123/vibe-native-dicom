@@ -72,6 +72,10 @@ import {
   DicomSegmentationOverlay,
   makeSyntheticDiscLabelMap,
   type Segment,
+  // Phase 7.4 — RTSTRUCT contour overlay
+  DicomRtStructOverlay,
+  makeSyntheticCircleContour,
+  type Structure,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -270,6 +274,39 @@ function App() {
     ],
     []
   );
+  // Phase 7.4 — RTSTRUCT contour overlay. Two synthetic structures
+  // ("GTV" and "spinal cord") drawn as circles at different image
+  // locations so the polyline rasterisation is exercised end-to-end.
+  const [rtOpacity, setRtOpacity] = useState<number>(0.9);
+  const [rtFill, setRtFill] = useState<boolean>(false);
+  const rtStructures: Structure[] = useMemo(() => {
+    if (!perf?.info) return [];
+    const cx = perf.info.columns / 2;
+    const cy = perf.info.rows / 2;
+    const r = Math.min(perf.info.rows, perf.info.columns) * 0.35;
+    return [
+      {
+        id: 1,
+        label: 'GTV (synthetic)',
+        r: 1,
+        g: 0.85,
+        b: 0.2,
+        strokeWidth: 2,
+        contours: [makeSyntheticCircleContour(cx, cy, r, 64)],
+      },
+      {
+        id: 2,
+        label: 'spinal cord (synthetic)',
+        r: 0.2,
+        g: 0.7,
+        b: 1,
+        strokeWidth: 1.5,
+        contours: [
+          makeSyntheticCircleContour(perf.info.columns * 0.2, cy, r * 0.4, 32),
+        ],
+      },
+    ];
+  }, [perf?.info]);
   // Phase 7.1 — two synced viewers showing the same pixel buffer.
   // In a real workflow the two filePaths would come from different
   // studies (prior vs. current). Here they share to validate the
@@ -1578,6 +1615,57 @@ function App() {
           </>
         )}
       </View>
+
+      <Text style={styles.section}>RTSTRUCT contours (Phase 7.4)</Text>
+      {perf?.info.hasPixelData ? (
+        <View style={styles.block}>
+          <Text style={styles.label}>
+            Two synthetic structures (yellow GTV + cyan spinal cord) drawn as
+            polyline paths over the base. Stroke-only by default; tap FILL to
+            alpha-blend the polygon interior.
+          </Text>
+          <View style={styles.viewerWrapper}>
+            <DicomRtStructOverlay
+              filePath={perf.info.filePath}
+              rows={perf.info.rows}
+              columns={perf.info.columns}
+              bitsAllocated={perf.info.bitsAllocated}
+              windowCenter={128}
+              windowWidth={256}
+              structures={rtStructures}
+              overlayOpacity={rtOpacity}
+              fill={rtFill}
+              width={192}
+              height={192}
+            />
+          </View>
+          <View style={styles.sliderRow}>
+            <Text
+              style={[styles.toolButton, rtFill && styles.toolButtonActive]}
+              onPress={() => setRtFill(!rtFill)}
+            >
+              {rtFill ? 'FILL ON' : 'FILL OFF'}
+            </Text>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => setRtOpacity(Math.max(0, rtOpacity - 0.1))}
+            >
+              −
+            </Text>
+            <Text style={styles.sliderValue}>
+              {Math.round(rtOpacity * 100)}%
+            </Text>
+            <Text
+              style={styles.sliderButton}
+              onPress={() => setRtOpacity(Math.min(1, rtOpacity + 0.1))}
+            >
+              +
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <Text style={styles.label}>Waiting for pixel data…</Text>
+      )}
 
       <Text style={styles.section}>Segmentation overlay (Phase 7.3)</Text>
       {perf?.info.hasPixelData && segLabelMap ? (

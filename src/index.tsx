@@ -41,6 +41,13 @@ export {
   buildSegmentPalette,
   makeSyntheticDiscLabelMap,
   type Segment,
+  // Phase 7.4 — RTSTRUCT contour overlay
+  DicomRtStructOverlay,
+  type DicomRtStructOverlayProps,
+  makeSyntheticCircleContour,
+  pixelToScreen,
+  type Contour,
+  type Structure,
   applyWindowLevel,
   type WindowLevelInput,
   bytesFromLatin1,
