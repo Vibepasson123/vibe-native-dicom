@@ -79,6 +79,9 @@ import {
   // Phase 8.1 — pixel-data LRU cache
   cachedExtractPixelDataToFile,
   sharedPixelDataCache,
+  // Phase 8.2 — series prefetcher
+  useSeriesPrefetch,
+  type PrefetchItem,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -195,6 +198,10 @@ function App() {
   // Phase 3.4 — path of the multi-frame synthetic file used by the cine panel.
   const [cinePath, setCinePath] = useState<string | null>(null);
   const [cineErr, setCineErr] = useState<string | null>(null);
+  // Phase 8.2 — slice paths kept so the prefetch panel can drive
+  // useSeriesPrefetch over them. Populated by the same synthetic
+  // volume the MPR panels use.
+  const [seriesSlicePaths, setSeriesSlicePaths] = useState<string[]>([]);
   // Phase 4.1 — measurement state.
   const measurements = useMeasurementsReducer();
   // Phase 4.2 — last exported SR file path (or error).
@@ -277,6 +284,19 @@ function App() {
     ],
     []
   );
+  // Phase 8.2 — prefetcher panel state. activeIndex drives the
+  // window-around-current priority order; the hook re-prioritises on
+  // each change and keeps two workers chewing through the queue.
+  const [prefetchActive, setPrefetchActive] = useState<number>(0);
+  const prefetchItems: PrefetchItem[] = useMemo(
+    () =>
+      seriesSlicePaths.map((p, i) => ({
+        dicomPath: p,
+        outPath: `/tmp/vnd-prefetch-${i}.pixels`,
+      })),
+    [seriesSlicePaths]
+  );
+  const prefetch = useSeriesPrefetch(prefetchItems, prefetchActive);
   // Phase 8.1 — LRU cache panel. We snapshot the shared cache's
   // stats and re-run cachedExtractPixelDataToFile in a tight loop on
   // user request — the second-through-Nth calls should all be hits.
@@ -495,6 +515,7 @@ function App() {
       );
       dir = probe.substring(0, probe.lastIndexOf('/'));
       const slicePaths = writeSyntheticVolumeSeries(dir, 16, 1.0);
+      setSeriesSlicePaths(slicePaths);
       const v = buildVolumeFromDicoms(slicePaths);
       setVolume(v);
     } catch (err) {
@@ -1643,6 +1664,42 @@ function App() {
             </View>
           </>
         )}
+      </View>
+
+      <Text style={styles.section}>Series prefetch (Phase 8.2)</Text>
+      <View style={styles.block}>
+        <Text style={styles.label}>
+          Two workers warm the LRU cache around `activeIndex` (the slice you're
+          scrubbing through). Forward and backward neighbours get prefetched in
+          turn so scrubbing in either direction is instant.
+        </Text>
+        <Text style={styles.value}>
+          enqueued {prefetch.stats.enqueued} · completed{' '}
+          {prefetch.stats.completed} · pending {prefetch.stats.pending} ·
+          in-flight {prefetch.stats.inFlight} · failed {prefetch.stats.failed}
+        </Text>
+        <Text style={styles.label}>activeIndex</Text>
+        <View style={styles.sliderRow}>
+          <Text
+            style={styles.sliderButton}
+            onPress={() => setPrefetchActive(Math.max(0, prefetchActive - 1))}
+          >
+            −
+          </Text>
+          <Text style={styles.sliderValue}>
+            {prefetchActive} / {Math.max(0, prefetchItems.length - 1)}
+          </Text>
+          <Text
+            style={styles.sliderButton}
+            onPress={() =>
+              setPrefetchActive(
+                Math.min(prefetchItems.length - 1, prefetchActive + 1)
+              )
+            }
+          >
+            +
+          </Text>
+        </View>
       </View>
 
       <Text style={styles.section}>Pixel-data LRU cache (Phase 8.1)</Text>

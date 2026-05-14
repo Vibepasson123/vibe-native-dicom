@@ -7,6 +7,7 @@ export {
   extractPixelDataToFile,
 } from './readDicom';
 // Phase 8.1 — LRU cache for extracted pixel-data metadata.
+// Phase 8.2 — series prefetcher (queue + workers around an active index).
 export {
   PixelDataCache,
   sharedPixelDataCache,
@@ -14,6 +15,14 @@ export {
   type PixelDataCacheOptions,
   type PixelDataCacheStats,
   type CachedExtractOptions,
+  SeriesPrefetcher,
+  prioritizeWindow,
+  useSeriesPrefetch,
+  type PrefetchItem,
+  type SeriesPrefetcherOptions,
+  type SeriesPrefetcherStats,
+  type UseSeriesPrefetchOptions,
+  type UseSeriesPrefetchResult,
 } from './cache';
 // Phase 3.1 — viewer surface (pure JS PNG path)
 // Phase 3.2 — Skia GPU path (optional peer dep)
