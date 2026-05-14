@@ -76,6 +76,9 @@ import {
   DicomRtStructOverlay,
   makeSyntheticCircleContour,
   type Structure,
+  // Phase 8.1 — pixel-data LRU cache
+  cachedExtractPixelDataToFile,
+  sharedPixelDataCache,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -274,6 +277,32 @@ function App() {
     ],
     []
   );
+  // Phase 8.1 — LRU cache panel. We snapshot the shared cache's
+  // stats and re-run cachedExtractPixelDataToFile in a tight loop on
+  // user request — the second-through-Nth calls should all be hits.
+  const [cacheStats, setCacheStats] = useState(() =>
+    sharedPixelDataCache.stats()
+  );
+  const refreshCacheStats = () => setCacheStats(sharedPixelDataCache.stats());
+  const runCacheBench = () => {
+    if (!perf?.info) return;
+    // 10 back-to-back extracts on the same path. First one populates
+    // the cache (or hits if a prior run already did); the next 9 are
+    // pure cache hits and skip native entirely.
+    for (let i = 0; i < 10; i++) {
+      try {
+        cachedExtractPixelDataToFile(
+          '/tmp/vnd-synthetic-default-1f.dcm',
+          perf.info.filePath
+        );
+      } catch {
+        // The first run may fail if the synthetic path differs from
+        // the one writeSyntheticDicom emitted; ignore — the cache
+        // behaviour itself is what we're demoing.
+      }
+    }
+    refreshCacheStats();
+  };
   // Phase 7.4 — RTSTRUCT contour overlay. Two synthetic structures
   // ("GTV" and "spinal cord") drawn as circles at different image
   // locations so the polyline rasterisation is exercised end-to-end.
@@ -1614,6 +1643,38 @@ function App() {
             </View>
           </>
         )}
+      </View>
+
+      <Text style={styles.section}>Pixel-data LRU cache (Phase 8.1)</Text>
+      <View style={styles.block}>
+        <Text style={styles.label}>
+          Shared cache. Tap RUN ×10 to extract the same DICOM ten times
+          back-to-back — the first call hits native, the next nine are cache
+          hits and skip the decode entirely.
+        </Text>
+        <Text style={styles.value}>
+          entries {cacheStats.size} · bytes {cacheStats.bytes} · hits{' '}
+          {cacheStats.hits} · misses {cacheStats.misses} · evictions{' '}
+          {cacheStats.evictions}
+        </Text>
+        <View style={styles.sliderRow}>
+          <Text style={styles.toolButton} onPress={runCacheBench}>
+            RUN ×10
+          </Text>
+          <Text style={styles.toolButton} onPress={refreshCacheStats}>
+            REFRESH
+          </Text>
+          <Text
+            style={styles.toolButton}
+            onPress={() => {
+              sharedPixelDataCache.clear();
+              sharedPixelDataCache.resetStats();
+              refreshCacheStats();
+            }}
+          >
+            CLEAR
+          </Text>
+        </View>
       </View>
 
       <Text style={styles.section}>RTSTRUCT contours (Phase 7.4)</Text>
