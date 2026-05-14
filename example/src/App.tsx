@@ -82,6 +82,10 @@ import {
   // Phase 8.2 — series prefetcher
   useSeriesPrefetch,
   type PrefetchItem,
+  // Phase 8.3 — hanging protocols
+  useHangingProtocol,
+  type StudyDescriptor,
+  type HangingProtocolName,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -297,6 +301,41 @@ function App() {
     [seriesSlicePaths]
   );
   const prefetch = useSeriesPrefetch(prefetchItems, prefetchActive);
+  // Phase 8.3 — hanging protocol demo. Three synthetic studies cover
+  // the three preset matchers (CT axial pair, prior/current by date,
+  // PET/CT fusion). Real apps feed StudyDescriptors built from
+  // readDicom() metadata; here we fabricate them so the protocol
+  // switcher visibly re-assigns slots.
+  const hpStudies: StudyDescriptor[] = useMemo(
+    () => [
+      {
+        id: 'ct-prior',
+        modality: 'CT',
+        bodyPartExamined: 'CHEST',
+        seriesDescription: 'CT chest axial (prior)',
+        studyDate: '20200101',
+        plane: 'axial',
+      },
+      {
+        id: 'ct-current',
+        modality: 'CT',
+        bodyPartExamined: 'CHEST',
+        seriesDescription: 'CT chest axial (current)',
+        studyDate: '20260101',
+        plane: 'axial',
+      },
+      {
+        id: 'pet-current',
+        modality: 'PT',
+        bodyPartExamined: 'CHEST',
+        seriesDescription: 'PET chest',
+        studyDate: '20260101',
+        plane: 'axial',
+      },
+    ],
+    []
+  );
+  const hp = useHangingProtocol(hpStudies, { initialProtocol: 'single' });
   // Phase 8.1 — LRU cache panel. We snapshot the shared cache's
   // stats and re-run cachedExtractPixelDataToFile in a tight loop on
   // user request — the second-through-Nth calls should all be hits.
@@ -1664,6 +1703,48 @@ function App() {
             </View>
           </>
         )}
+      </View>
+
+      <Text style={styles.section}>Hanging protocols (Phase 8.3)</Text>
+      <View style={styles.block}>
+        <Text style={styles.label}>
+          Three synthetic studies (CT prior 2020 · CT current 2026 · PET current
+          2026) routed through the bundled presets. Tap a preset to re-resolve
+          slot assignments.
+        </Text>
+        <View style={styles.sliderRow}>
+          {(
+            [
+              'single',
+              'ct-axial-2up',
+              'prior-current',
+              'pet-ct-fusion',
+            ] as HangingProtocolName[]
+          ).map((name) => {
+            const active = name === hp.protocolName;
+            return (
+              <Text
+                key={name}
+                style={[styles.toolButton, active && styles.toolButtonActive]}
+                onPress={() => hp.setProtocolName(name)}
+              >
+                {name}
+              </Text>
+            );
+          })}
+        </View>
+        <Text style={styles.label}>
+          {hp.protocol.layout.rows}×{hp.protocol.layout.cols} ·{' '}
+          {hp.protocol.label}
+        </Text>
+        {hp.applied.assignments.map((a, i) => (
+          <Text key={i} style={styles.value}>
+            slot [{a.slot.row},{a.slot.col}] {a.slot.label ?? ''} →{' '}
+            {a.study
+              ? `${a.study.id} (${a.study.modality}${a.study.studyDate ? ` ${a.study.studyDate}` : ''})`
+              : '— empty —'}
+          </Text>
+        ))}
       </View>
 
       <Text style={styles.section}>Series prefetch (Phase 8.2)</Text>

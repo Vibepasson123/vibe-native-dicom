@@ -6,6 +6,26 @@ export {
   isSupportedTransferSyntax,
   extractPixelDataToFile,
 } from './readDicom';
+// Phase 8.3 — hanging protocols (declarative viewport layouts).
+export {
+  applyHangingProtocol,
+  findAssignmentAt,
+  sortStudiesByDate,
+  SINGLE,
+  CT_AXIAL_2UP,
+  PRIOR_CURRENT,
+  PET_CT_FUSION,
+  HANGING_PROTOCOLS,
+  useHangingProtocol,
+  type StudyDescriptor,
+  type ProtocolSlot,
+  type HangingProtocol,
+  type HangingProtocolName,
+  type SlotAssignment,
+  type AppliedHangingProtocol,
+  type UseHangingProtocolOptions,
+  type UseHangingProtocolResult,
+} from './workflow';
 // Phase 8.1 — LRU cache for extracted pixel-data metadata.
 // Phase 8.2 — series prefetcher (queue + workers around an active index).
 export {
