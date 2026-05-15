@@ -86,6 +86,8 @@ import {
   useHangingProtocol,
   type StudyDescriptor,
   type HangingProtocolName,
+  // Phase 8.4 — anonymization
+  anonymizeDataset,
   // Phase 2.3 helpers
   getPatientName,
   getPatientID,
@@ -1704,6 +1706,41 @@ function App() {
           </>
         )}
       </View>
+
+      <Text style={styles.section}>Anonymization (Phase 8.4)</Text>
+      {reference ? (
+        <View style={styles.block}>
+          <Text style={styles.label}>
+            Synthetic dataset run through anonymizeDataset. PHI tags are
+            scrubbed per PS3.15 §E.1 (X / Z / D / U actions). Compare before /
+            after on a few load-bearing tags below.
+          </Text>
+          {(() => {
+            const before = reference.dataset;
+            const after = anonymizeDataset(before);
+            const TAGS: Array<[string, string]> = [
+              ['0010,0010', 'PatientName'],
+              ['0010,0020', 'PatientID'],
+              ['0010,0030', 'BirthDate'],
+              ['0008,0050', 'AccessionNumber'],
+              ['0020,000D', 'StudyInstanceUID'],
+              ['0008,1030', 'StudyDescription'],
+            ];
+            return TAGS.map(([tag, label]) => {
+              const b = before[tag];
+              const a = after[tag];
+              return (
+                <Text key={tag} style={styles.value}>
+                  {label} · before {String(b?.value ?? '—')} · after{' '}
+                  {a === undefined ? '— (deleted)' : String(a.value ?? '—')}
+                </Text>
+              );
+            });
+          })()}
+        </View>
+      ) : (
+        <Text style={styles.label}>Waiting for parsed reference dataset…</Text>
+      )}
 
       <Text style={styles.section}>Hanging protocols (Phase 8.3)</Text>
       <View style={styles.block}>

@@ -6,6 +6,15 @@ export {
   isSupportedTransferSyntax,
   extractPixelDataToFile,
 } from './readDicom';
+// Phase 8.4 — DICOM anonymization (de-identification).
+export {
+  anonymizeDataset,
+  anonymizeDicomFile,
+  describeAnonymizationActions,
+  UidRemapper,
+  type AnonymizationAction,
+  type AnonymizationOptions,
+} from './anonymize';
 // Phase 8.3 — hanging protocols (declarative viewport layouts).
 export {
   applyHangingProtocol,
