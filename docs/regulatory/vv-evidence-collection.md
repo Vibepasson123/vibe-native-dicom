@@ -12,7 +12,7 @@ Per `SR-9003`:
 
 > A full release-grade V&V evidence package — coverage HTML, mutation reports, test summaries — is implemented in Phase 9.
 
-Phase 9.1 ships the **collector**. Subsequent phases (9.2+) layer coverage HTML, mutation reports, and real-fixture image tests on top of the same bundle directory.
+Phase 9.1 shipped the **collector**. Phase 9.2 added **coverage HTML + JSON summary**. Subsequent phases layer mutation reports and real-fixture image tests on top of the same bundle directory.
 
 ## 2. Running the collector
 
@@ -35,7 +35,9 @@ docs/regulatory/vv-evidence/<ISO-date>-<short-sha>/
     manifest.md             — human-readable rendering of manifest.json
     typecheck.txt           — full tsc --noEmit output
     lint.txt                — full eslint output (src + example)
-    jest.txt                — full jest --ci output
+    jest.txt                — full jest --ci --coverage output
+    coverage/               — istanbul HTML + JSON summary (open index.html)
+    coverage/coverage-summary.json — machine-readable per-metric totals
     android-assemble.txt    — gradle :app:assembleDebug output (if --android)
     ios-xcodebuild.txt      — xcodebuild output (if --ios)
     git-status.txt          — `git status` at collection time
@@ -48,6 +50,7 @@ docs/regulatory/vv-evidence/<ISO-date>-<short-sha>/
 - **`tooling`** — Node, npm, Xcode, and the *configured* (not detected) Android NDK from `android/build.gradle`.
 - **`steps`** — array of `{label, command, exitCode, ms, passed, outFile}` for every step that ran.
 - **`jestStats`** — parsed `{suitesPassed, suitesTotal, testsPassed, testsTotal}` so downstream tooling doesn't have to re-grep.
+- **`coverage`** _(schema 2+)_ — `{statementsPct, branchesPct, functionsPct, linesPct, raw}` parsed from `coverage/coverage-summary.json`. `null` when the coverage step didn't run.
 - **`fileHashes`** — SHA-256 of every captured log file, so a reviewer can detect post-hoc edits.
 
 ## 4. When to run
@@ -64,10 +67,15 @@ docs/regulatory/vv-evidence/<ISO-date>-<short-sha>/
 
 ## 6. Schema versioning
 
-`manifest.json` carries a `schema` field (currently `"vv-evidence/1"`). Future-incompatible changes bump the schema and add a migration note here. Tooling that parses bundles MUST check the schema field and reject unknown versions rather than silently misread.
+`manifest.json` carries a `schema` field (currently `"vv-evidence/2"`). Future-incompatible changes bump the schema and add a migration note here. Tooling that parses bundles MUST check the schema field and reject unknown versions rather than silently misread.
+
+**Migration notes:**
+
+- **`vv-evidence/1 → vv-evidence/2`** (Phase 9.2): added the optional top-level `coverage` block and the `coverage/` subdirectory. Schema-1 readers may ignore both; schema-2 readers MUST tolerate `coverage: null` for runs that skipped the coverage reporter.
 
 ## 7. Change history
 
 | Date | Change | Commit |
 | --- | --- | --- |
-| 2026-05-15 | Initial protocol — Phase 9.1 collector ships. | (this commit) |
+| 2026-05-15 | Initial protocol — Phase 9.1 collector ships. | d3218ad |
+| 2026-05-15 | Phase 9.2 — coverage HTML + JSON summary; schema bumped to `vv-evidence/2`. | (this commit) |

@@ -1,0 +1,25 @@
+cb4e8df feat: phase 9.2 — coverage HTML + JSON in V&V bundle
+d3218ad feat: phase 9.1 — V&V evidence collector
+343c346 feat: phase 8.4 — DICOM anonymization (de-identification)
+27544d9 feat: phase 8.3 — hanging protocols
+13c4a2c feat: phase 8.2 — series prefetcher
+e7ebc87 feat: phase 8.1 — pixel-data LRU cache
+a7cbede feat: phase 7.4 — RTSTRUCT contour overlay
+741febb feat: phase 7.3 — segmentation label-map overlay
+1bff61a feat: phase 7.2 — fusion overlay viewer + colormaps
+b99eca3 feat: phase 7.1 — synced side-by-side viewer group
+b2bc358 feat: phase 6.5 — volume-render presets + useVolumeRenderController
+b1b2819 feat: phase 6.4 — Phong-shaded volume rendering
+b96ec0c feat: phase 6.3 — clip planes for volume rendering
+29953c1 feat: phase 6.2 — volume rendering with transfer function
+a23d242 feat: phase 6.1 — slab projection (MIP / MinIP / Average)
+87ce8e6 feat: phase 5.3 — oblique reformatting (slice along arbitrary plane)
+2682fa7 feat: phase 5.2 — compressed-series + non-uniform Z resample for MPR
+dba3c95 feat: phase 5.1 — orthogonal MPR (axial / sagittal / coronal)
+b320b8f feat: phase 4.2 — bidirectional + cobb measurements + DICOM SR export
+96bd70f feat: phase 4.1 — measurement tools (linear / angle / ROI)
+d45aa1e feat: phase 3.4 — multi-frame DICOM + cine playback
+9b3f083 feat: phase 3.3 — pinch / pan / rotate gestures on Skia viewer
+4140cca feat: phase 3.2 — DicomImageViewSkia (GPU W/L via SkSL shader)
+8a3fce1 feat: phase 3.1 — DicomImageView with live window/level
+a25129f feat: phase 2.5 — extractPixelDataToFile bypasses base64 for pixel transfer

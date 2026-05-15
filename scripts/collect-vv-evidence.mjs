@@ -153,12 +153,24 @@ steps.push(
   )
 );
 
-// 3. Jest
+// 3. Jest with coverage. Coverage HTML + JSON summary land in a
+// `coverage/` subdirectory inside the bundle so an auditor can open
+// `coverage/index.html` for line-by-line drill-down, and a downstream
+// tool can parse `coverage/coverage-summary.json` programmatically.
+const coverageDir = join(bundleDir, 'coverage');
 steps.push(
   runStep(
     'jest',
     'npx',
-    ['jest', '--ci', '--reporters=default'],
+    [
+      'jest',
+      '--ci',
+      '--coverage',
+      '--coverageReporters=json-summary',
+      '--coverageReporters=html',
+      '--coverageReporters=text-summary',
+      `--coverageDirectory=${coverageDir}`,
+    ],
     join(bundleDir, 'jest.txt')
   )
 );
@@ -235,6 +247,33 @@ const jestStats = jestStep
   ? parseJestSummary(readFileSync(join(REPO_ROOT, jestStep.outFile), 'utf8'))
   : null;
 
+// -------- Coverage summary (Phase 9.2) --------------------------------
+//
+// Jest's json-summary reporter writes coverage-summary.json with a
+// `total` block keyed by metric (statements/branches/functions/lines),
+// each carrying { total, covered, skipped, pct }. We surface only the
+// `pct` values in the manifest; the raw JSON stays inside the bundle
+// for any downstream tool that needs the full breakdown.
+function readCoverageSummary() {
+  const summaryPath = join(coverageDir, 'coverage-summary.json');
+  if (!existsSync(summaryPath)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(summaryPath, 'utf8'));
+    const t = parsed?.total;
+    if (!t) return null;
+    return {
+      statementsPct: t.statements?.pct ?? null,
+      branchesPct: t.branches?.pct ?? null,
+      functionsPct: t.functions?.pct ?? null,
+      linesPct: t.lines?.pct ?? null,
+      raw: t,
+    };
+  } catch {
+    return null;
+  }
+}
+const coverage = readCoverageSummary();
+
 // -------- File SHA-256 manifest ---------------------------------------
 
 function sha256(path) {
@@ -250,7 +289,10 @@ const fileHashes = steps.map((s) => ({
 // -------- manifest.json + manifest.md ---------------------------------
 
 const manifest = {
-  schema: 'vv-evidence/1',
+  // Schema 2 adds the `coverage` block (Phase 9.2). Schema 1 manifests
+  // remain readable — downstream tools can branch on the presence of
+  // `coverage` or version-check this field.
+  schema: 'vv-evidence/2',
   generatedAt: isoNow,
   bundle: bundleName,
   git: {
@@ -270,6 +312,7 @@ const manifest = {
   },
   steps,
   jestStats,
+  coverage,
   fileHashes,
 };
 
@@ -320,6 +363,20 @@ function renderMarkdown(m) {
     lines.push(`- Tests:  ${m.jestStats.testsPassed}/${m.jestStats.testsTotal} passed`);
     lines.push('');
   }
+  if (m.coverage) {
+    const fmt = (pct) => (pct == null ? '—' : `${pct.toFixed(2)}%`);
+    lines.push('## Coverage');
+    lines.push('');
+    lines.push('Full HTML drill-down: [`coverage/index.html`](./coverage/index.html)');
+    lines.push('');
+    lines.push('| Metric | Coverage |');
+    lines.push('| --- | --- |');
+    lines.push(`| Statements | ${fmt(m.coverage.statementsPct)} |`);
+    lines.push(`| Branches | ${fmt(m.coverage.branchesPct)} |`);
+    lines.push(`| Functions | ${fmt(m.coverage.functionsPct)} |`);
+    lines.push(`| Lines | ${fmt(m.coverage.linesPct)} |`);
+    lines.push('');
+  }
   lines.push('## File hashes (SHA-256)');
   lines.push('');
   for (const f of m.fileHashes) {
@@ -343,6 +400,12 @@ for (const s of steps) {
 if (jestStats) {
   console.log(
     `  jest:    suites ${jestStats.suitesPassed}/${jestStats.suitesTotal}, tests ${jestStats.testsPassed}/${jestStats.testsTotal}`
+  );
+}
+if (coverage) {
+  const f = (p) => (p == null ? '—' : `${p.toFixed(1)}%`);
+  console.log(
+    `  cov:     stmts ${f(coverage.statementsPct)}, branches ${f(coverage.branchesPct)}, fns ${f(coverage.functionsPct)}, lines ${f(coverage.linesPct)}`
   );
 }
 console.log(

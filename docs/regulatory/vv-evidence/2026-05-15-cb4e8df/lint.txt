@@ -1,0 +1,2 @@
+# lint produced no output on stdout/stderr.
+# Exit code 0; this is the expected "silent success" outcome for tsc / eslint when there are no errors to report.

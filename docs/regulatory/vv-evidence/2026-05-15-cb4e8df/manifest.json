@@ -1,0 +1,104 @@
+{
+  "schema": "vv-evidence/2",
+  "generatedAt": "2026-05-15T05:32:37.055Z",
+  "bundle": "2026-05-15-cb4e8df",
+  "git": {
+    "headSha": "cb4e8dfc35697181a817572a7a5b63625fe8f8da",
+    "shortSha": "cb4e8df",
+    "branch": "main",
+    "commitMessage": "feat: phase 9.2 — coverage HTML + JSON in V&V bundle",
+    "commitDate": "2026-05-15T06:32:31+01:00",
+    "describedTag": "cb4e8df",
+    "workingTreeClean": false
+  },
+  "tooling": {
+    "nodeVersion": "v24.14.1",
+    "npmVersion": "11.11.0",
+    "xcodeVersion": "Xcode 26.2",
+    "ndkVersion": "27.1.12297006"
+  },
+  "steps": [
+    {
+      "label": "typecheck",
+      "command": "npx tsc --noEmit",
+      "exitCode": 0,
+      "ms": 1659,
+      "passed": true,
+      "outFile": "docs/regulatory/vv-evidence/2026-05-15-cb4e8df/typecheck.txt"
+    },
+    {
+      "label": "lint",
+      "command": "npx eslint src example",
+      "exitCode": 0,
+      "ms": 2766,
+      "passed": true,
+      "outFile": "docs/regulatory/vv-evidence/2026-05-15-cb4e8df/lint.txt"
+    },
+    {
+      "label": "jest",
+      "command": "npx jest --ci --coverage --coverageReporters=json-summary --coverageReporters=html --coverageReporters=text-summary --coverageDirectory=/Users/viveksah/vibe_native_DICOM/docs/regulatory/vv-evidence/2026-05-15-cb4e8df/coverage",
+      "exitCode": 0,
+      "ms": 2291,
+      "passed": true,
+      "outFile": "docs/regulatory/vv-evidence/2026-05-15-cb4e8df/jest.txt"
+    }
+  ],
+  "jestStats": {
+    "suitesPassed": 23,
+    "suitesTotal": 23,
+    "testsPassed": 251,
+    "testsTotal": 251
+  },
+  "coverage": {
+    "statementsPct": 59.15,
+    "branchesPct": 55.27,
+    "functionsPct": 54.84,
+    "linesPct": 60.37,
+    "raw": {
+      "lines": {
+        "total": 1373,
+        "covered": 829,
+        "skipped": 0,
+        "pct": 60.37
+      },
+      "statements": {
+        "total": 1496,
+        "covered": 885,
+        "skipped": 0,
+        "pct": 59.15
+      },
+      "functions": {
+        "total": 299,
+        "covered": 164,
+        "skipped": 0,
+        "pct": 54.84
+      },
+      "branches": {
+        "total": 664,
+        "covered": 367,
+        "skipped": 0,
+        "pct": 55.27
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      }
+    }
+  },
+  "fileHashes": [
+    {
+      "file": "docs/regulatory/vv-evidence/2026-05-15-cb4e8df/typecheck.txt",
+      "sha256": "00bf757b1b190fbfbab97355083e07cc76903125cd96a0e6afeeeb77cfaef534"
+    },
+    {
+      "file": "docs/regulatory/vv-evidence/2026-05-15-cb4e8df/lint.txt",
+      "sha256": "05be70d7a51ed8bcd18afcf638319e4909c34090ca345716aa5a7165dfa33666"
+    },
+    {
+      "file": "docs/regulatory/vv-evidence/2026-05-15-cb4e8df/jest.txt",
+      "sha256": "1e2dbe635474717969989cef01fd35392828eb34a295f1316331450df46f3782"
+    }
+  ]
+}
