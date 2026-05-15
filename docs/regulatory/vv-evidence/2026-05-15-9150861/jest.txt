@@ -1,0 +1,37 @@
+
+--- STDERR ---
+watchman warning: Recrawled this watch 3 times, most recently because:
+MustScanSubDirs UserDroppedTo resolve, please review the information on
+https://facebook.github.io/watchman/docs/troubleshooting.html#recrawl
+To clear this warning, run:
+`watchman watch-del '/Users/viveksah/vibe_native_DICOM' ; watchman watch-project '/Users/viveksah/vibe_native_DICOM'`
+
+PASS src/cache/__tests__/cachedExtractPixelDataToFile.test.ts
+PASS src/measurements/__tests__/math.test.ts
+PASS src/anonymize/__tests__/anonymizeDataset.test.ts
+PASS src/cache/__tests__/seriesPrefetcher.test.ts
+PASS src/dicomweb/__tests__/url.test.ts
+PASS src/viewer/__tests__/rtStruct.test.ts
+PASS src/cache/__tests__/pixelDataCache.test.ts
+PASS src/workflow/__tests__/hangingProtocol.test.ts
+PASS src/viewer/__tests__/png.test.ts
+PASS src/viewer/__tests__/windowLevel.test.ts
+PASS src/dicomweb/__tests__/client.test.ts
+PASS src/viewer/__tests__/colormaps.test.ts
+PASS src/viewer/__tests__/segmentation.test.ts
+PASS src/viewer/__tests__/useSyncedViewerGroup.test.ts
+PASS src/mpr/__tests__/volumeRenderPresets.test.ts
+PASS src/mpr/__tests__/oblique.test.ts
+PASS src/measurements/__tests__/exportSr.test.ts
+PASS src/mpr/__tests__/useMprController.test.ts
+PASS src/dicomweb/__tests__/multipart.test.ts
+PASS src/mpr/__tests__/volume.test.ts
+PASS src/measurements/__tests__/canvasToImage.test.ts
+PASS src/measurements/__tests__/reducer.test.ts
+PASS src/__tests__/index.test.tsx
+
+Test Suites: 23 passed, 23 total
+Tests:       251 passed, 251 total
+Snapshots:   0 total
+Time:        0.488 s, estimated 1 s
+Ran all test suites.

@@ -42,6 +42,8 @@
     "typecheck": "tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "test": "jest",
+    "vv:collect": "node scripts/collect-vv-evidence.mjs",
+    "vv:collect:all": "node scripts/collect-vv-evidence.mjs --all",
     "release": "release-it --only-version"
   },
   "keywords": [
