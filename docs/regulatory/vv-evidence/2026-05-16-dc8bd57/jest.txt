@@ -1,0 +1,21 @@
+
+=============================== Coverage summary ===============================
+Statements   : 61.05% ( 958/1569 )
+Branches     : 55.27% ( 367/664 )
+Functions    : 55.59% ( 169/304 )
+Lines        : 62.24% ( 897/1441 )
+================================================================================
+
+--- STDERR ---
+watchman warning: Recrawled this watch 3 times, most recently because:
+MustScanSubDirs UserDroppedTo resolve, please review the information on
+https://facebook.github.io/watchman/docs/troubleshooting.html#recrawl
+To clear this warning, run:
+`watchman watch-del '/Users/viveksah/vibe_native_DICOM' ; watchman watch-project '/Users/viveksah/vibe_native_DICOM'`
+
+
+Test Suites: 24 passed, 24 total
+Tests:       256 passed, 256 total
+Snapshots:   0 total
+Time:        1.541 s
+Ran all test suites.
