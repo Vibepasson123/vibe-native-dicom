@@ -134,3 +134,4 @@ After Phase 0, **Phase 1 (build infra)** starts under full traceability.
 | --- | --- | --- |
 | 2026-04-26 | Initial plan committed | Vivek Sah |
 | 2026-04-28 | Re-scoped Phase 1: scope narrowed to GDCM-only build infrastructure (GDCM's bundled libjpeg-turbo / OpenJPEG / CharLS satisfy "Hello-world call from JS into GDCM" — original Phase 1 acceptance criterion). Direct-SOUP integration of those three libs deferred to Phase 2, where it pays off as transfer-syntax fixtures hit GDCM's bundled-fork limits. Phase 2 effort estimate raised 4–5 wk → 5–7 wk to absorb that work. | Vivek Sah |
+| 2026-05-16 | Phases 2 through 9 completed and merged on `main`. Phase 10 release prep: version bumped to 1.0.0, CHANGELOG + README rewritten around real APIs, DICOM conformance statement promoted Draft → Released for 1.0 with §2–§9 populated from as-shipped scope. Per-phase narrative is in `CHANGELOG.md`. | Vivek Sah |
