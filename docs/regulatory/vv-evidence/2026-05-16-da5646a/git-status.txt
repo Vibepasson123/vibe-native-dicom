@@ -1,0 +1,15 @@
+On branch main
+Your branch is ahead of 'origin/main' by 17 commits.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   scripts/collect-vv-evidence.mjs
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.claude/
+	docs/regulatory/vv-evidence/2026-05-16-da5646a/
+
+no changes added to commit (use "git add" and/or "git commit -a")

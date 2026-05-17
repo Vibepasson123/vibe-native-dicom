@@ -1,0 +1,128 @@
+{
+  "schema": "vv-evidence/2",
+  "generatedAt": "2026-05-16T15:16:36.041Z",
+  "bundle": "2026-05-16-da5646a",
+  "git": {
+    "headSha": "da5646a71d7f28268b5197c16775641448308091",
+    "shortSha": "da5646a",
+    "branch": "main",
+    "commitMessage": "chore: release 1.0.0",
+    "commitDate": "2026-05-16T15:55:54+01:00",
+    "describedTag": "v1.0.0",
+    "workingTreeClean": false
+  },
+  "tooling": {
+    "nodeVersion": "v24.14.1",
+    "npmVersion": "11.11.0",
+    "xcodeVersion": "Xcode 26.2",
+    "ndkVersion": "27.1.12297006"
+  },
+  "steps": [
+    {
+      "label": "typecheck",
+      "command": "npx tsc --noEmit",
+      "exitCode": 0,
+      "ms": 1577,
+      "passed": true,
+      "outFile": "docs/regulatory/vv-evidence/2026-05-16-da5646a/typecheck.txt"
+    },
+    {
+      "label": "lint",
+      "command": "npx eslint src example",
+      "exitCode": 0,
+      "ms": 3271,
+      "passed": true,
+      "outFile": "docs/regulatory/vv-evidence/2026-05-16-da5646a/lint.txt"
+    },
+    {
+      "label": "jest",
+      "command": "npx jest --ci --coverage --coverageReporters=json-summary --coverageReporters=html --coverageReporters=text-summary --coverageDirectory=/Users/viveksah/vibe_native_DICOM/docs/regulatory/vv-evidence/2026-05-16-da5646a/coverage",
+      "exitCode": 0,
+      "ms": 1367,
+      "passed": true,
+      "outFile": "docs/regulatory/vv-evidence/2026-05-16-da5646a/jest.txt"
+    },
+    {
+      "label": "android-assemble",
+      "command": "/Users/viveksah/vibe_native_DICOM/example/android/gradlew -p /Users/viveksah/vibe_native_DICOM/example/android :app:assembleDebug",
+      "exitCode": 0,
+      "ms": 18137,
+      "passed": true,
+      "outFile": "docs/regulatory/vv-evidence/2026-05-16-da5646a/android-assemble.txt"
+    },
+    {
+      "label": "ios-xcodebuild",
+      "command": "xcodebuild -workspace /Users/viveksah/vibe_native_DICOM/example/ios/VibeNativeDicomExample.xcworkspace -scheme VibeNativeDicomExample -configuration Debug -destination generic/platform=iOS Simulator -derivedDataPath /Users/viveksah/vibe_native_DICOM/example/ios/build CODE_SIGN_IDENTITY= CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO",
+      "exitCode": 0,
+      "ms": 3109,
+      "passed": true,
+      "outFile": "docs/regulatory/vv-evidence/2026-05-16-da5646a/ios-xcodebuild.txt"
+    }
+  ],
+  "jestStats": {
+    "suitesPassed": 24,
+    "suitesTotal": 24,
+    "testsPassed": 256,
+    "testsTotal": 256
+  },
+  "coverage": {
+    "statementsPct": 61.05,
+    "branchesPct": 55.27,
+    "functionsPct": 55.59,
+    "linesPct": 62.24,
+    "raw": {
+      "lines": {
+        "total": 1441,
+        "covered": 897,
+        "skipped": 0,
+        "pct": 62.24
+      },
+      "statements": {
+        "total": 1569,
+        "covered": 958,
+        "skipped": 0,
+        "pct": 61.05
+      },
+      "functions": {
+        "total": 304,
+        "covered": 169,
+        "skipped": 0,
+        "pct": 55.59
+      },
+      "branches": {
+        "total": 664,
+        "covered": 367,
+        "skipped": 0,
+        "pct": 55.27
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      }
+    }
+  },
+  "fileHashes": [
+    {
+      "file": "docs/regulatory/vv-evidence/2026-05-16-da5646a/typecheck.txt",
+      "sha256": "00bf757b1b190fbfbab97355083e07cc76903125cd96a0e6afeeeb77cfaef534"
+    },
+    {
+      "file": "docs/regulatory/vv-evidence/2026-05-16-da5646a/lint.txt",
+      "sha256": "05be70d7a51ed8bcd18afcf638319e4909c34090ca345716aa5a7165dfa33666"
+    },
+    {
+      "file": "docs/regulatory/vv-evidence/2026-05-16-da5646a/jest.txt",
+      "sha256": "9619e13f2bf223673bfe0dcd11b5a2cc5d2ddb4d9139008d9f40e6091f1bf7f8"
+    },
+    {
+      "file": "docs/regulatory/vv-evidence/2026-05-16-da5646a/android-assemble.txt",
+      "sha256": "8be8dfcf0952d8e33602ccd1c16b2cdea888cc747b210640b24fe4dd7722a880"
+    },
+    {
+      "file": "docs/regulatory/vv-evidence/2026-05-16-da5646a/ios-xcodebuild.txt",
+      "sha256": "7d34e5d65affd409085a6adcd37f25fb630d97cf349a7e97df3557ea636203a8"
+    }
+  ]
+}

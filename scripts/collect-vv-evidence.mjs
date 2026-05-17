@@ -114,16 +114,32 @@ function runStep(label, cmd, args, outFile) {
   const stdout = result.stdout ?? '';
   const stderr = result.stderr ?? '';
   let combined = stdout + (stderr ? `\n--- STDERR ---\n${stderr}` : '');
+  const passed = result.status === 0;
   if (combined.trim().length === 0) {
-    // Silent successful runs (tsc / eslint produce no output on clean
-    // passes) — write a positive marker so auditors don't see an
-    // empty file and assume the step was skipped, and so SHA-256s
-    // differ between distinct silent runs.
-    combined =
-      `# ${label} produced no output on stdout/stderr.\n` +
-      `# Exit code ${result.status ?? -1}; this is the expected ` +
-      `"silent success" outcome for tsc / eslint when there are no ` +
-      `errors to report.\n`;
+    if (passed) {
+      // Silent successful runs (tsc / eslint produce no output on clean
+      // passes) — write a positive marker so auditors don't see an
+      // empty file and assume the step was skipped, and so SHA-256s
+      // differ between distinct silent runs.
+      combined =
+        `# ${label} produced no output on stdout/stderr.\n` +
+        `# Exit code 0; this is the expected "silent success" outcome ` +
+        `for tsc / eslint when there are no errors to report.\n`;
+    } else {
+      // Failed but produced no output. Most often: spawnSync couldn't
+      // launch the binary (ENOENT — exit -1) and the error landed on
+      // result.error rather than stderr. Surface that explicitly so a
+      // reviewer doesn't have to dig into source to interpret the bundle.
+      const errMsg = result.error
+        ? `${result.error.name}: ${result.error.message}`
+        : 'no error object recorded';
+      combined =
+        `# ${label} FAILED with no stdout/stderr output.\n` +
+        `# Exit code ${result.status ?? -1} · signal ${result.signal ?? 'none'}\n` +
+        `# spawnSync error: ${errMsg}\n` +
+        `# This usually means the binary could not be launched — check ` +
+        `the working directory and the command path.\n`;
+    }
   }
   writeFileSync(outFile, combined);
   return {
@@ -131,7 +147,7 @@ function runStep(label, cmd, args, outFile) {
     command: `${cmd} ${args.join(' ')}`,
     exitCode: result.status ?? -1,
     ms,
-    passed: result.status === 0,
+    passed,
     outFile: relative(REPO_ROOT, outFile),
   };
 }
@@ -175,13 +191,18 @@ steps.push(
   )
 );
 
-// 4. Android (optional)
+// 4. Android (optional). gradlew lives inside example/android/, not at
+// the repo root — pass the absolute path so spawnSync can launch it
+// regardless of the collector's cwd. We also keep `-p exampleAndroid`
+// so gradle's project directory matches the wrapper's parent (defensive
+// against future restructuring).
 if (RUN_ANDROID) {
   const exampleAndroid = join(REPO_ROOT, 'example', 'android');
+  const gradlew = join(exampleAndroid, 'gradlew');
   steps.push(
     runStep(
       'android-assemble',
-      './gradlew',
+      gradlew,
       ['-p', exampleAndroid, ':app:assembleDebug'],
       join(bundleDir, 'android-assemble.txt')
     )
