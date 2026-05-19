@@ -2,7 +2,7 @@ import type { DicomFile, PixelDataInfo } from './types';
 
 export function readDicom(_path: string): DicomFile {
   throw new Error(
-    "'@viveksah/vibe-native-dicom' is only supported on native platforms."
+    "'@vibepasson/vibe-native-dicom' is only supported on native platforms."
   );
 }
 
@@ -11,13 +11,13 @@ export function writeSyntheticDicom(
   _numberOfFrames: number = 1
 ): string {
   throw new Error(
-    "'@viveksah/vibe-native-dicom' is only supported on native platforms."
+    "'@vibepasson/vibe-native-dicom' is only supported on native platforms."
   );
 }
 
 export function isSupportedTransferSyntax(_transferSyntaxUID: string): boolean {
   throw new Error(
-    "'@viveksah/vibe-native-dicom' is only supported on native platforms."
+    "'@vibepasson/vibe-native-dicom' is only supported on native platforms."
   );
 }
 
@@ -26,6 +26,6 @@ export function extractPixelDataToFile(
   _outPath: string
 ): PixelDataInfo {
   throw new Error(
-    "'@viveksah/vibe-native-dicom' is only supported on native platforms."
+    "'@vibepasson/vibe-native-dicom' is only supported on native platforms."
   );
 }

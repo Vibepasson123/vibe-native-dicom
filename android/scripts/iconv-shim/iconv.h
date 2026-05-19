@@ -10,7 +10,7 @@
 //
 // Effect on Android: the MEC MR3 vendor extension still parses everything
 // except Japanese text fields, which are emitted as "No iconv support".
-// No public API in @viveksah/vibe-native-dicom exposes this vendor parser
+// No public API in @vibepasson/vibe-native-dicom exposes this vendor parser
 // today (Phase 1) — see docs/regulatory/conformance-statement.md §4.
 //
 // On iOS, libiconv is part of the system SDK; this shim is not used there

@@ -2,6 +2,6 @@
 
 export function readBinaryFile(_path: string, _maxBytes: number): string {
   throw new Error(
-    "'@viveksah/vibe-native-dicom' viewer is only supported on native platforms."
+    "'@vibepasson/vibe-native-dicom' viewer is only supported on native platforms."
   );
 }

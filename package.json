@@ -1,5 +1,5 @@
 {
-  "name": "@viveksah/vibe-native-dicom",
+  "name": "@vibepasson/vibe-native-dicom",
   "version": "1.0.0",
   "description": "React Native library for DICOM parsing and rendering on iOS and Android",
   "main": "./lib/module/index.js",

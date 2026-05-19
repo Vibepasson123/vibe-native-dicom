@@ -1,4 +1,4 @@
-# Implementation Plan — `@viveksah/vibe-native-dicom`
+# Implementation Plan — `@vibepasson/vibe-native-dicom`
 
 **Status:** Approved · **Last updated:** 2026-04-26 · **Owner:** Vivek Sah
 
@@ -12,7 +12,7 @@ A React Native package providing **diagnostic-grade DICOM** capabilities (parsin
 
 | Item | Value |
 | --- | --- |
-| Package | `@viveksah/vibe-native-dicom` (monolithic, MIT, npm) |
+| Package | `@vibepasson/vibe-native-dicom` (monolithic, MIT, npm) |
 | Architecture | Turbo Module + Fabric View, New Arch only |
 | Languages | TypeScript (strict), Swift (behind Obj-C++ shim), Kotlin |
 | Strategy | Wrap mature C/C++ libs (GDCM, libjpeg-turbo, OpenJPEG, CharLS, VTK), thin native + TS layers on top |

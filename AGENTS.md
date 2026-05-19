@@ -12,7 +12,7 @@ If anything in this file conflicts with [`docs/PLAN.md`](docs/PLAN.md) or [`docs
 
 | Field | Value |
 | --- | --- |
-| Package | `@viveksah/vibe-native-dicom` (monolithic, MIT, npm) |
+| Package | `@vibepasson/vibe-native-dicom` (monolithic, MIT, npm) |
 | Purpose | Diagnostic-grade DICOM viewing & I/O React Native component (parsing, decoding, 2D/MPR/3D viewing, measurement tools, DICOMweb) |
 | Intended use | Integrated into medical device software products by third-party manufacturers. We are the **component supplier**; the integrator is the regulatory manufacturer. |
 | License | MIT |

@@ -1,11 +1,11 @@
-# @viveksah/vibe-native-dicom
+# @vibepasson/vibe-native-dicom
 
 Diagnostic-grade DICOM SDK for React Native — parsing, GPU-accelerated viewing, MPR, volume rendering, fusion overlays, segmentation, and the workflow primitives (cache, prefetch, hanging protocols, anonymization) that a clinical viewer needs around them.
 
 Targets iOS and Android via TurboModules + Fabric, with C++ image decoding through a vendored GDCM 3.2.5 and Skia for GPU rendering.
 
 ```sh
-npm install @viveksah/vibe-native-dicom @shopify/react-native-skia react-native-gesture-handler
+npm install @vibepasson/vibe-native-dicom @shopify/react-native-skia react-native-gesture-handler
 ```
 
 Requires React Native ≥ 0.85 with the new architecture enabled. See [`docs/integration/getting-started.md`](docs/integration/getting-started.md) for host requirements (iOS 15.1, Xcode 26.x, Android NDK 27.1) and the first-slice round-trip.
@@ -17,7 +17,7 @@ import {
   readDicom,
   extractPixelDataToFile,
   DicomImageViewSkia,
-} from '@viveksah/vibe-native-dicom';
+} from '@vibepasson/vibe-native-dicom';
 
 const file = readDicom(dicomPath);
 const info = extractPixelDataToFile(dicomPath, outPath);

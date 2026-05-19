@@ -2,7 +2,7 @@
 
 **Standard:** DICOM PS 3.2 · **Status:** Released for 1.0 · **Last updated:** 2026-05-16 · **Owner:** Vivek Sah
 
-This statement applies to `@viveksah/vibe-native-dicom` v1.0.0 and later patch releases. Material changes bump the document's status and `Last updated` date and are recorded in §10.
+This statement applies to `@vibepasson/vibe-native-dicom` v1.0.0 and later patch releases. Material changes bump the document's status and `Last updated` date and are recorded in §10.
 
 ## 1. Introduction
 
@@ -17,7 +17,7 @@ This statement applies to `@viveksah/vibe-native-dicom` v1.0.0 and later patch r
 
 ### 1.2 Scope of this document
 
-This conformance statement describes the DICOM conformance of the `@viveksah/vibe-native-dicom` software component as supplied to integrating customers. Conformance of any finished medical device incorporating this component is the responsibility of the integrating customer.
+This conformance statement describes the DICOM conformance of the `@vibepasson/vibe-native-dicom` software component as supplied to integrating customers. Conformance of any finished medical device incorporating this component is the responsibility of the integrating customer.
 
 ## 2. Networking
 

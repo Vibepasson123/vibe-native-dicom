@@ -2,7 +2,7 @@
 
 **Status:** Approved · **Last updated:** 2026-04-26 · **Owner:** Vivek Sah · **Linked requirements:** SR-0001, SR-0002, SR-0003, SR-0005, SR-0007, SR-0008, SR-0010
 
-This document records the decision on **how third-party native libraries (SOUP) are integrated into the iOS and Android builds** of `@viveksah/vibe-native-dicom`. It is the precondition for Phase 1 task 1.2 onward and binds the integration pattern for all subsequent SOUP additions (libjpeg-turbo, OpenJPEG, CharLS, VTK, Eigen).
+This document records the decision on **how third-party native libraries (SOUP) are integrated into the iOS and Android builds** of `@vibepasson/vibe-native-dicom`. It is the precondition for Phase 1 task 1.2 onward and binds the integration pattern for all subsequent SOUP additions (libjpeg-turbo, OpenJPEG, CharLS, VTK, Eigen).
 
 The decision below applies symmetrically to both platforms. Where iOS and Android differ in mechanics, both are described.
 
@@ -204,7 +204,7 @@ Switching to a standalone script side-steps the autolink entirely — our packag
 
 Android's bionic libc does not ship `iconv`, but GDCM's `Utilities/gdcmext/mec_mr3_io.c` (Toshiba / Canon MEC MR3 vendor-extension parser) hard-includes `<iconv.h>`. To compile GDCM unmodified, we provide a header-only shim at `android/scripts/iconv-shim/iconv.h` whose `iconv_open` returns `(iconv_t)-1`. The upstream code already has a fallback for that case (emits the literal "No iconv support" for Japanese text fields).
 
-Effect on Android: the MEC MR3 vendor parser still works for everything except Japanese text within those proprietary tags. iOS uses the system libiconv and has full functionality. **No public API in `@viveksah/vibe-native-dicom` exposes this vendor parser today**, so this divergence does not break the cross-platform parity contract for any shipped feature. If we expose vendor-extension parsing in a future phase, this limitation is documented in the integration guide and the Conformance Statement.
+Effect on Android: the MEC MR3 vendor parser still works for everything except Japanese text within those proprietary tags. iOS uses the system libiconv and has full functionality. **No public API in `@vibepasson/vibe-native-dicom` exposes this vendor parser today**, so this divergence does not break the cross-platform parity contract for any shipped feature. If we expose vendor-extension parsing in a future phase, this limitation is documented in the integration guide and the Conformance Statement.
 
 ### NDK pinning
 

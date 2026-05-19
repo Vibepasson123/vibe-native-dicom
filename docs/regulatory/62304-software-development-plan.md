@@ -6,7 +6,7 @@
 
 | Field | Value |
 | --- | --- |
-| Software name | `@viveksah/vibe-native-dicom` |
+| Software name | `@vibepasson/vibe-native-dicom` |
 | Software type | React Native package — DICOM viewing & I/O component |
 | Intended use | Integration into Medical Device Software products by third-party manufacturers |
 | Software safety class | **C** (see [`62304-software-safety-class.md`](62304-software-safety-class.md)) |

@@ -4,7 +4,7 @@
 
 ## 1. Purpose
 
-Defines how `@viveksah/vibe-native-dicom` is validated — demonstrating the software does what it's intended to do in realistic clinical-adjacent scenarios.
+Defines how `@vibepasson/vibe-native-dicom` is validated — demonstrating the software does what it's intended to do in realistic clinical-adjacent scenarios.
 
 > Note: As a software component, full clinical validation is the responsibility of the integrating customer (the regulatory manufacturer). We perform **component-level validation** sufficient for a customer to trust the SDK. Customers run additional validation in their finished device per their own validation plan.
 

@@ -1,6 +1,6 @@
 # API Overview
 
-Every export from `@viveksah/vibe-native-dicom`, grouped by capability. The package surface is a single barrel ([`src/index.tsx`](../../src/index.tsx)); this document mirrors that file's structure so you can locate the canonical declaration in seconds.
+Every export from `@vibepasson/vibe-native-dicom`, grouped by capability. The package surface is a single barrel ([`src/index.tsx`](../../src/index.tsx)); this document mirrors that file's structure so you can locate the canonical declaration in seconds.
 
 Conventions:
 

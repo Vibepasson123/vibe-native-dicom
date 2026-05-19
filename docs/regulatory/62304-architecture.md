@@ -4,7 +4,7 @@
 
 ## 1. Purpose
 
-Describes the high-level architecture of `@viveksah/vibe-native-dicom`, its decomposition into software items, and dependencies on third-party libraries (SOUP).
+Describes the high-level architecture of `@vibepasson/vibe-native-dicom`, its decomposition into software items, and dependencies on third-party libraries (SOUP).
 
 > Filled in iteratively. Update this document at each phase boundary and whenever a new top-level module is added.
 
@@ -14,7 +14,7 @@ Describes the high-level architecture of `@viveksah/vibe-native-dicom`, its deco
 ┌──────────────────────────────────────────────┐
 │  Customer's React Native App                 │
 │  ┌────────────────────────────────────────┐  │
-│  │  @viveksah/vibe-native-dicom (SDK)    │  │
+│  │  @vibepasson/vibe-native-dicom (SDK)    │  │
 │  │  ┌────────────┐  ┌──────────────────┐  │  │
 │  │  │ JS / TS    │  │ Native (iOS/    │  │  │
 │  │  │ public API │  │ Android)        │  │  │

@@ -4,7 +4,7 @@
 
 ## 1. Purpose
 
-Defines how `@viveksah/vibe-native-dicom` is verified — i.e. how we demonstrate that the software meets its requirements ([`62304-requirements.md`](62304-requirements.md)).
+Defines how `@vibepasson/vibe-native-dicom` is verified — i.e. how we demonstrate that the software meets its requirements ([`62304-requirements.md`](62304-requirements.md)).
 
 ## 2. Test types
 

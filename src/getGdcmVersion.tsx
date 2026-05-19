@@ -4,6 +4,6 @@
 
 export function getGdcmVersion(): string {
   throw new Error(
-    "'@viveksah/vibe-native-dicom' is only supported on native platforms."
+    "'@vibepasson/vibe-native-dicom' is only supported on native platforms."
   );
 }

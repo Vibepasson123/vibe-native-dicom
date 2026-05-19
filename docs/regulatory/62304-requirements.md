@@ -4,7 +4,7 @@
 
 ## 1. Purpose
 
-Numbered, testable software requirements for `@viveksah/vibe-native-dicom`. Each requirement has:
+Numbered, testable software requirements for `@vibepasson/vibe-native-dicom`. Each requirement has:
 
 - ID (`SR-XXXX`)
 - Title

@@ -1,6 +1,6 @@
 # Regulatory Documentation
 
-This folder holds the **IEC 62304** software lifecycle documentation, **ISO 14971** risk management documentation, and the **DICOM Conformance Statement** for `@viveksah/vibe-native-dicom`.
+This folder holds the **IEC 62304** software lifecycle documentation, **ISO 14971** risk management documentation, and the **DICOM Conformance Statement** for `@vibepasson/vibe-native-dicom`.
 
 These documents are intended to be supplied to customers (medical device manufacturers integrating this package) as part of their regulatory submission to FDA / Notified Body / MDR Authority. They MUST stay in sync with the code.
 

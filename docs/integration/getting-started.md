@@ -5,7 +5,7 @@ This guide takes an integrator from `npm install` to a rendered DICOM slice on i
 ## 1. Install
 
 ```sh
-npm install @viveksah/vibe-native-dicom
+npm install @vibepasson/vibe-native-dicom
 ```
 
 ### Required peer dependencies
@@ -42,7 +42,7 @@ import {
   extractPixelDataToFile,
   // Phase 3.2 — GPU viewer
   DicomImageViewSkia,
-} from '@viveksah/vibe-native-dicom';
+} from '@vibepasson/vibe-native-dicom';
 
 function MyViewer({ dicomPath, outPath }: { dicomPath: string; outPath: string }) {
   const file = readDicom(dicomPath);

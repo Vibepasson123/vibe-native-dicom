@@ -1,6 +1,6 @@
 # Third-Party Licenses
 
-This file documents every third-party software library bundled, linked into, or distributed with `@viveksah/vibe-native-dicom`. It satisfies:
+This file documents every third-party software library bundled, linked into, or distributed with `@vibepasson/vibe-native-dicom`. It satisfies:
 
 1. The **attribution requirements** of each library's open-source license (BSD, MIT, Apache, MPL — all permissive, all require we preserve copyright + license text).
 2. The **IEC 62304 §5.3.3 SOUP inventory** requirement (cross-referenced from [`docs/regulatory/62304-architecture.md`](docs/regulatory/62304-architecture.md) §4).
@@ -171,7 +171,7 @@ Source: [`third_party/gdcm/Copyright.txt`](third_party/gdcm/Copyright.txt) at ta
 
 ## Package itself
 
-`@viveksah/vibe-native-dicom` is licensed under MIT — see [`LICENSE`](LICENSE).
+`@vibepasson/vibe-native-dicom` is licensed under MIT — see [`LICENSE`](LICENSE).
 
 ---
 

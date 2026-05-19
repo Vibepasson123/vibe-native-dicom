@@ -2,7 +2,7 @@
 
 **Standard:** ISO 14971:2019 · **Status:** Draft · **Last updated:** 2026-04-26 · **Owner:** Vivek Sah
 
-Concrete hazards identified for `@viveksah/vibe-native-dicom`. Severity / probability per [`14971-risk-management.md`](14971-risk-management.md).
+Concrete hazards identified for `@vibepasson/vibe-native-dicom`. Severity / probability per [`14971-risk-management.md`](14971-risk-management.md).
 
 > Initial pass — expanded as features are added. Each row should evolve through: identified → controls designed → controls implemented → residual risk verified.
 

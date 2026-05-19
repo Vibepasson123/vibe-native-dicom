@@ -100,7 +100,7 @@ import {
   getRescaleSlope,
   getRescaleIntercept,
   type DicomFile,
-} from '@viveksah/vibe-native-dicom';
+} from '@vibepasson/vibe-native-dicom';
 
 const EXPECTED_GDCM_VERSION = '3.2.5';
 

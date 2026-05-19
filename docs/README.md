@@ -1,4 +1,4 @@
-# Documentation — `@viveksah/vibe-native-dicom`
+# Documentation — `@vibepasson/vibe-native-dicom`
 
 This folder contains all documentation for the package. Everything here is **plain Markdown**, version-controlled with the code, and ready to be published as a static site (Docusaurus / VitePress / GitHub Pages) when we choose.
 

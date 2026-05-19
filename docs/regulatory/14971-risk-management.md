@@ -4,7 +4,7 @@
 
 ## 1. Scope
 
-This Risk Management File covers the software component `@viveksah/vibe-native-dicom`. Component-level risks are documented here; system-level risks for the finished medical device remain the integrating customer's responsibility.
+This Risk Management File covers the software component `@vibepasson/vibe-native-dicom`. Component-level risks are documented here; system-level risks for the finished medical device remain the integrating customer's responsibility.
 
 ## 2. Process
 

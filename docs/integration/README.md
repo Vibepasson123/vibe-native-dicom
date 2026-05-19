@@ -1,6 +1,6 @@
 # Integration Guide
 
-Customer-facing documentation. Targeted at the engineers integrating `@viveksah/vibe-native-dicom` into their React Native medical device application.
+Customer-facing documentation. Targeted at the engineers integrating `@vibepasson/vibe-native-dicom` into their React Native medical device application.
 
 ## Available now
 

@@ -301,7 +301,7 @@ jest.mock('../NativeVibeNativeDicom', () => {
 
 const lib = require('../index') as typeof import('../index');
 
-describe('@viveksah/vibe-native-dicom — public surface', () => {
+describe('@vibepasson/vibe-native-dicom — public surface', () => {
   it('exports the Phase 1 + Phase 2.1 + Phase 2.2 functions', () => {
     expect(typeof lib.multiply).toBe('function');
     expect(typeof lib.getGdcmVersion).toBe('function');

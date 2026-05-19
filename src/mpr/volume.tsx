@@ -15,7 +15,7 @@ export function buildVolumeFromDicoms(
   _opts?: BuildVolumeOptions
 ): VolumeInfo {
   throw new Error(
-    "'@viveksah/vibe-native-dicom' is only supported on native platforms."
+    "'@vibepasson/vibe-native-dicom' is only supported on native platforms."
   );
 }
 
@@ -26,13 +26,13 @@ export function extractMprSlice(
   _outPath: string
 ): MprSliceInfo {
   throw new Error(
-    "'@viveksah/vibe-native-dicom' is only supported on native platforms."
+    "'@vibepasson/vibe-native-dicom' is only supported on native platforms."
   );
 }
 
 export function releaseVolume(_handle: number): void {
   throw new Error(
-    "'@viveksah/vibe-native-dicom' is only supported on native platforms."
+    "'@vibepasson/vibe-native-dicom' is only supported on native platforms."
   );
 }
 
@@ -42,7 +42,7 @@ export function extractObliqueSlice(
   _outPath: string
 ): MprSliceInfo {
   throw new Error(
-    "'@viveksah/vibe-native-dicom' is only supported on native platforms."
+    "'@vibepasson/vibe-native-dicom' is only supported on native platforms."
   );
 }
 
@@ -53,7 +53,7 @@ export function extractProjectionSlab(
   _outPath: string
 ): MprSliceInfo {
   throw new Error(
-    "'@viveksah/vibe-native-dicom' is only supported on native platforms."
+    "'@vibepasson/vibe-native-dicom' is only supported on native platforms."
   );
 }
 
@@ -64,7 +64,7 @@ export function extractVolumeRender(
   _outPath: string
 ): MprSliceInfo {
   throw new Error(
-    "'@viveksah/vibe-native-dicom' is only supported on native platforms."
+    "'@vibepasson/vibe-native-dicom' is only supported on native platforms."
   );
 }
 
@@ -82,6 +82,6 @@ export function writeSyntheticVolumeSeries(
   _opts?: SyntheticVolumeSeriesOptions
 ): string[] {
   throw new Error(
-    "'@viveksah/vibe-native-dicom' is only supported on native platforms."
+    "'@vibepasson/vibe-native-dicom' is only supported on native platforms."
   );
 }
