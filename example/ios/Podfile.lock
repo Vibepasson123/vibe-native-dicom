@@ -1793,7 +1793,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - VibeNativeDicom (0.1.0):
+  - VibeNativeDicom (1.0.1):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2126,7 +2126,7 @@ SPEC CHECKSUMS:
   ReactCommon: fe2a3af8975e63efa60f95fca8c34dc85deee360
   ReactNativeDependencies: 4f0d89ba4957a08910cb55f1888a671f1a569320
   RNGestureHandler: 187c5c7936abf427bc4d22d6c3b1ac80ad1f63c0
-  VibeNativeDicom: 88238a9aee237e15673bcc1779997ead5799f21e
+  VibeNativeDicom: fca47797d7d9446799c1bb5afb4497810ea9b646
   Yoga: e83c3121d079541e69f3c5c623faaaf933fb5812
 
 PODFILE CHECKSUM: 7a7e89cc4bf03bbe79d55a182cff6a011cb0014b

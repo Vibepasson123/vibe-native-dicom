@@ -2,6 +2,44 @@
 
 All notable changes to `@vibepasson/vibe-native-dicom` are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-05-27
+
+### Fixed
+
+- **iOS install on a consumer machine now works.** 1.0.0's podspec ran
+  `ios/scripts/build-gdcm.sh` from a `prepare_command`, which required
+  `third_party/gdcm` (a git submodule used by maintainers to build GDCM
+  from source). That directory was never included in the npm tarball, so
+  every customer `pod install` failed with:
+  `✗ GDCM source not found at .../third_party/gdcm`.
+
+  1.0.1 ships **a prebuilt `GDCM.xcframework`** (both `ios-arm64` device
+  and `ios-arm64_x86_64-simulator` slices) under `ios/Frameworks/`. The
+  podspec consumes it via `vendored_frameworks`; the `prepare_command`
+  is gone. Header paths and link flags are wired through `pod_target_xcconfig`
+  (compile-time) and `user_target_xcconfig` (consumer-link-time, via the
+  stable `${BUILT_PRODUCTS_DIR}/XCFrameworkIntermediates/VibeNativeDicom/`
+  path that CocoaPods extracts the per-slice `.a` into).
+
+  Customer impact: `pod install` drops from ~3 min (CMake compiling GDCM
+  on first install) to ~10 s, and no longer requires the consumer to
+  have CMake installed.
+
+  Tarball weight: 246 KB → 15.2 MB packed (60× larger), 950 KB → 58.8 MB
+  unpacked. The static-archive slices dominate; expected for an SDK that
+  ships a vendored C++ image-decoding library.
+
+### Maintainer notes
+
+- `ios/scripts/build-gdcm.sh` is kept in the repo for reproducibility —
+  invoke when bumping GDCM. Output goes to `.build/ios/GDCM.xcframework`
+  by default; copy to `ios/Frameworks/GDCM.xcframework/` for it to land
+  in the next npm tarball.
+- The Android JNI build path is unaffected by this fix; Android consumers
+  always compiled GDCM via `android/scripts/build-gdcm.sh` on first
+  Gradle build, which works fine because Gradle is part of every RN
+  Android toolchain.
+
 ## [1.0.0] — 2026-05-16
 
 First production release. Closes the eleven-phase roadmap in [`docs/PLAN.md`](docs/PLAN.md). The full per-commit history is in `git log`; the entries below condense it to the capability units that consumers see.
